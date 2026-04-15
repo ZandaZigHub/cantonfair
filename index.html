@@ -1826,6 +1826,106 @@ const DEFAULT_HIT=[
   {id:19,name:"Sequence selector",notes:"",priority:"med",cat:"Product",done:false},
   {id:20,name:"New 54mm deadbolt",notes:"",priority:"med",cat:"Product",done:false},
 ];
+// ══════════════════════════════════════════
+// MASTER INIT
+// ══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+
+  // LOGIN
+  ['BW','GW','AC','PT'].forEach(function(uid) {
+    var b = document.getElementById('ubtn-'+uid);
+    if (b) b.addEventListener('click', function() { selectUser(uid); });
+  });
+  [1,2,3,4,5,6,7,8,9,0].forEach(function(n) {
+    var b = document.getElementById('pk'+n);
+    if (b) b.addEventListener('click', function() { pinKey(String(n)); });
+  });
+  var pdel = document.getElementById('pkdel');
+  if (pdel) pdel.addEventListener('click', pinDel);
+  var pgo = document.getElementById('pkgo');
+  if (pgo) pgo.addEventListener('click', pinGo);
+
+  // SUPPLIERS
+  var sab = document.getElementById('sup-add-btn');
+  if (sab) sab.addEventListener('click', function() { toggleF('sup-form'); });
+  var sfs = document.getElementById('sf-save');
+  if (sfs) sfs.addEventListener('click', addSup);
+  var sfc = document.getElementById('sf-cancel');
+  if (sfc) sfc.addEventListener('click', function() { document.getElementById('sup-form').classList.remove('open'); });
+  ['all','Fair','Hotel','TBC','Not attending'].forEach(function(f) {
+    var b = document.getElementById('sff-'+f);
+    if (b) b.addEventListener('click', function() { filterSup(f); });
+  });
+
+  // HIT LIST
+  var hab = document.getElementById('hit-add-btn');
+  if (hab) hab.addEventListener('click', function() { toggleF('hit-form'); });
+  var hfs = document.getElementById('hf-save');
+  if (hfs) hfs.addEventListener('click', addHit);
+  var hfc = document.getElementById('hf-cancel');
+  if (hfc) hfc.addEventListener('click', function() { document.getElementById('hit-form').classList.remove('open'); });
+
+  // PRODUCTS
+  var psq = document.getElementById('ps-q');
+  if (psq) psq.addEventListener('input', searchP);
+  var hcq = document.getElementById('hc-q');
+  if (hcq) hcq.addEventListener('input', calcH);
+  var hcc = document.getElementById('hc-c');
+  if (hcc) hcc.addEventListener('input', calcH);
+
+  // LOOKUP
+  var lqb = document.getElementById('lq-btn');
+  if (lqb) lqb.addEventListener('click', doLookup);
+  var lqi = document.getElementById('lq');
+  if (lqi) lqi.addEventListener('keydown', function(e) { if (e.key==='Enter') doLookup(); });
+  document.querySelectorAll('.lq-chip').forEach(function(b) {
+    b.addEventListener('click', function() { document.getElementById('lq').value = b.textContent; doLookup(); });
+  });
+  var optb = document.getElementById('opt-btn');
+  if (optb) optb.addEventListener('click', optimiseRoute);
+
+  // MEETINGS
+  setupMeetingsListeners();
+
+  // COMMS
+  var ncb = document.getElementById('new-chat-btn');
+  if (ncb) ncb.addEventListener('click', openNewChat);
+  var nmcc = document.getElementById('ncm-cancel');
+  if (nmcc) nmcc.addEventListener('click', function() { document.getElementById('new-chat-modal').classList.add('hide'); });
+  var nms = document.getElementById('ncm-start');
+  if (nms) nms.addEventListener('click', startNewChat);
+  var cb = document.getElementById('chat-back');
+  if (cb) cb.addEventListener('click', backToList);
+  var snd = document.getElementById('send-btn');
+  if (snd) snd.addEventListener('click', sendMsg);
+  var mi = document.getElementById('msg-in');
+  if (mi) {
+    mi.addEventListener('keydown', function(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
+    mi.addEventListener('input', function() { this.style.height=''; this.style.height=Math.min(this.scrollHeight,90)+'px'; });
+  }
+  var camb = document.getElementById('cam-btn');
+  if (camb) camb.addEventListener('click', function() { document.getElementById('photo-in').click(); });
+  var phi = document.getElementById('photo-in');
+  if (phi) phi.addEventListener('change', handlePhoto);
+
+  // ZIG
+  var zsb = document.getElementById('zig-sb');
+  if (zsb) zsb.addEventListener('click', sendZig);
+  var zin = document.getElementById('zig-input');
+  if (zin) {
+    zin.addEventListener('keydown', function(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendZig(); } });
+    zin.addEventListener('input', function() { this.style.height=''; this.style.height=Math.min(this.scrollHeight,80)+'px'; });
+  }
+
+  // INIT DATA + AUTO-LOGIN
+  loadFX();
+  initComms();
+  initZig();
+
+  var u = lsGet('user', null);
+  if (u && USERS[u]) { currentUser = u; setTimeout(launch, 50); }
+});
+
 </script>
 <script src="products.js"></script>
 
