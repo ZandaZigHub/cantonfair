@@ -632,7 +632,7 @@ textarea.fi{resize:vertical;min-height:60px}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const ANTHROPIC_KEY = ''; // ← PASTE YOUR sk-ant-... KEY HERE
+const ANTHROPIC_KEY = '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';
 const SUPA_URL  = 'https://tusbnuhmdhwggcsnxumd.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c2JudWhtZGh3Z2djc254dW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjE4MDYsImV4cCI6MjA5MTc5NzgwNn0.d57PdqCDt_0PthKzyZRqK_Mqefz5CX216A9iB-twxVU';
 
@@ -1411,7 +1411,7 @@ async function stopMeeting(save){
       }catch(e){m.transcript='[Transcription failed — tap ✏ to type notes manually]';}
       m.processing=false;
     }catch(e){m.transcript='[Error — tap ✏ to type notes]';m.processing=false;}
-    const proc=document.getElementById('mtg-processing');if(proc)proc.style.display='none';
+    const proc2=document.getElementById('mtg-processing');if(proc2)proc2.style.display='none';
   } else if(!ANTHROPIC_KEY){
     m.transcript='[Add API key for auto-transcription — tap ✏ to type notes]';m.processing=false;
   } else {
