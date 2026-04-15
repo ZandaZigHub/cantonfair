@@ -40,6 +40,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .login-btn{width:100%;padding:.85rem;background:var(--navy);color:#fff;border:none;border-radius:var(--rs);font-family:'Montserrat',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:.15s}
 .login-btn:hover{background:var(--navy-dk)}
 .le{color:var(--red);font-size:.78rem;min-height:1.1rem;margin-top:.35rem;font-family:'Montserrat',sans-serif}
+.pin-key{padding:.85rem;border:1.5px solid var(--border);border-radius:var(--rs);background:var(--bg);font-family:'Montserrat',sans-serif;font-weight:700;font-size:1.1rem;cursor:pointer;transition:.12s;color:var(--navy);-webkit-tap-highlight-color:transparent;user-select:none}
+.pin-key:active{background:var(--navy);color:#fff;border-color:var(--navy);transform:scale(.95)}
 
 /* ── SHELL ── */
 #app{display:none;flex-direction:column;min-height:100vh}
@@ -354,12 +356,32 @@ textarea.fi{resize:vertical;min-height:60px}
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
       </button>
     </div>
-    <div class="pw-row">
-      <input class="pw-input" type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="login-btn" style="width:auto;padding:.7rem 1.25rem" onclick="doLogin()" ontouchstart="event.preventDefault();doLogin()">→</button>
+    <!-- PIN display -->
+    <div id="pin-display" style="display:flex;justify-content:center;gap:.5rem;margin-bottom:.85rem;height:2.2rem;align-items:center">
+      <span style="font-size:.7rem;color:var(--muted);font-family:'Montserrat',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Enter PIN</span>
+    </div>
+    <div id="pin-dots" style="display:flex;justify-content:center;gap:.6rem;margin-bottom:.85rem">
+      <div id="pd0" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--border);background:#fff;transition:.15s"></div>
+      <div id="pd1" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--border);background:#fff;transition:.15s"></div>
+      <div id="pd2" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--border);background:#fff;transition:.15s"></div>
+      <div id="pd3" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--border);background:#fff;transition:.15s"></div>
+    </div>
+    <!-- PIN pad -->
+    <div id="pin-pad" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.6rem">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key pin-del" onclick="pinDel()" style="font-size:1rem">⌫</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key pin-go" onclick="pinGo()" style="background:var(--navy);color:#fff;border-color:var(--navy)">→</button>
     </div>
     <div class="le" id="le"></div>
-    <div style="font-size:.65rem;color:var(--dim);margin-top:.75rem">Shared password · All users</div>
   </div>
 </div>
 
@@ -931,44 +953,82 @@ function setSyncStatus(status) {
 // ════════════════════════════════════════════════════════
 // LOGIN
 // ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// LOGIN — PIN PAD
+// ════════════════════════════════════════════════════════
+const USER_PINS = { BW:'2606', GW:'1706', AC:'1706', PT:'1706' };
+// BW = Brent: 2606 (26 June — Vaughan's due month, easy to remember)
+// GW/AC/PT = 1706 (17 June — trip return date, easy to share)
+
+let pinEntry = '';
+
 function selectUser(uid, el) {
   selectedUserForLogin = uid;
   document.querySelectorAll('.user-btn').forEach(b => b.classList.remove('sel'));
   el.classList.add('sel');
-  document.getElementById('pw-input').focus();
+  pinEntry = '';
+  updatePinDots();
+  document.getElementById('le').textContent = '';
 }
-function doLogin() {
-  const pwEl = document.getElementById('pw-input');
-  const errEl = document.getElementById('le');
-  // Read value multiple ways to defeat autofill weirdness
-  let pw = pwEl.value;
-  if (!pw) pw = pwEl.getAttribute('value') || '';
-  pw = pw.trim();
 
-  errEl.style.color = 'var(--red)';
-
+function pinKey(d) {
+  if (pinEntry.length >= 4) return;
   if (!selectedUserForLogin) {
-    errEl.textContent = 'Tap your name first ↑';
-    document.querySelectorAll('.user-btn').forEach(b => { b.style.outline='2px solid var(--red)'; setTimeout(()=>b.style.outline='',1200); });
+    const le = document.getElementById('le');
+    le.textContent = 'Tap your name first ↑';
+    document.querySelectorAll('.user-btn').forEach(b => { b.style.outline='2px solid var(--red)'; setTimeout(()=>b.style.outline='',1000); });
     return;
   }
-  if (!pw) {
-    errEl.textContent = 'Enter the password.';
-    pwEl.focus();
+  pinEntry += d;
+  updatePinDots();
+  if (pinEntry.length === 4) setTimeout(pinGo, 120);
+}
+
+function pinDel() {
+  pinEntry = pinEntry.slice(0, -1);
+  updatePinDots();
+  document.getElementById('le').textContent = '';
+}
+
+function pinGo() {
+  const le = document.getElementById('le');
+  if (!selectedUserForLogin) {
+    le.textContent = 'Tap your name first ↑';
     return;
   }
-  if (pw !== APP_PASSWORD) {
-    errEl.textContent = 'Wrong password — try again.';
-    pwEl.value = '';
-    pwEl.focus();
+  if (pinEntry.length < 4) {
+    le.textContent = 'Enter 4-digit PIN.';
     return;
   }
-  // Success
-  errEl.textContent = '';
+  if (pinEntry !== USER_PINS[selectedUserForLogin]) {
+    le.textContent = 'Wrong PIN — try again.';
+    pinEntry = '';
+    updatePinDots();
+    // Shake effect
+    const pad = document.getElementById('pin-dots');
+    pad.style.transform='translateX(-8px)';setTimeout(()=>pad.style.transform='translateX(8px)',80);setTimeout(()=>pad.style.transform='',160);
+    return;
+  }
+  le.textContent = '';
   currentUser = selectedUserForLogin;
   lsSet('user', currentUser);
   launch();
 }
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pd'+i);
+    if (i < pinEntry.length) {
+      d.style.background = 'var(--navy)';
+      d.style.borderColor = 'var(--navy)';
+    } else {
+      d.style.background = '#fff';
+      d.style.borderColor = 'var(--border)';
+    }
+  }
+}
+
+function doLogin() { pinGo(); } // legacy fallback
 (function(){ const u=lsGet('user',null); if(u&&USERS[u]){ currentUser=u; setTimeout(launch,50); } })();
 
 // ════════════════════════════════════════════════════════
