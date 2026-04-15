@@ -1727,7 +1727,7 @@ async function stopRec(send){
 // ════════════════════════════════════════════════════════
 // MEETING TRANSCRIBER
 // ════════════════════════════════════════════════════════
-let meetings=lsGet('meetings',[]);
+meetings=lsGet('meetings',[]);
 let activeMeeting=null,meetingRec=null,meetingChunks=[],meetingRecInt=null,meetingElapsed=0;
 
 function initTranscriber(){
