@@ -688,6 +688,17 @@ textarea.fi{resize:vertical;min-height:60px}
       <button class="btn btn-p btn-full" id="notes-save-btn" style="margin-top:.4rem">Save Notes</button>
     </div>
 
+    <!-- API Key -->
+    <div class="card" style="margin-bottom:.75rem">
+      <div class="ct">⚡ Zig API Key</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.5rem">Required for Zig, Lookup, and meeting transcription. Get a key at <strong>console.anthropic.com</strong> → API Keys. Stored only on this device, never sent to GitHub.</div>
+      <div style="display:flex;gap:.4rem;margin-bottom:.4rem">
+        <input class="fi" id="api-key-input" type="password" placeholder="sk-ant-api03-..." style="flex:1;font-family:monospace;font-size:.8rem">
+        <button class="btn btn-p" id="api-key-save">Save</button>
+      </div>
+      <div id="api-key-status" style="font-size:.75rem"></div>
+    </div>
+
     <!-- Logout -->
     <div class="card">
       <div class="ct">Session</div>
@@ -722,7 +733,7 @@ textarea.fi{resize:vertical;min-height:60px}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const ANTHROPIC_KEY = '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';
+let ANTHROPIC_KEY = localStorage.getItem('zig_api_key') || '';
 const SUPA_URL  = 'https://tusbnuhmdhwggcsnxumd.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c2JudWhtZGh3Z2djc254dW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjE4MDYsImV4cCI6MjA5MTc5NzgwNn0.d57PdqCDt_0PthKzyZRqK_Mqefz5CX216A9iB-twxVU';
 
@@ -1392,6 +1403,7 @@ You can take actions. Return JSON in tags (no explanation needed, just do it):
 
 When a user pastes an email, silently extract supplier details and add them without asking.`;
 
+  if(!ANTHROPIC_KEY){ addZM('zig','⚠ No API key. Go to ⚙ Options tab and add your Anthropic key to activate Zig.'); return; }
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1616,6 +1628,7 @@ function editMeetingNotes(id){
 }
 
 async function extractActions(m){
+  if(!ANTHROPIC_KEY){ addZM('zig','⚠ No API key. Go to ⚙ Options tab and add your Anthropic key to activate Zig.'); return; }
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1738,6 +1751,24 @@ function initOptions(){
     lsSet('shared_notes', txt);
     await SB.upsert('cf_settings',{key:'shared_notes',value:txt,updated_at:new Date().toISOString()});
     showToast('Notes saved and synced');
+  });
+
+  // API key
+  const akInput = document.getElementById('api-key-input');
+  const akSave = document.getElementById('api-key-save');
+  const akStatus = document.getElementById('api-key-status');
+  if(akInput && ANTHROPIC_KEY) akInput.value = ANTHROPIC_KEY;
+  if(akStatus) akStatus.textContent = ANTHROPIC_KEY ? '✓ Key saved on this device' : '⚠ No key — Zig and Lookup disabled';
+  if(akStatus) akStatus.style.color = ANTHROPIC_KEY ? 'var(--green)' : 'var(--red)';
+  if(akSave) akSave.addEventListener('click', ()=>{
+    const key = akInput.value.trim();
+    if(!key.startsWith('sk-ant-')){ 
+      akStatus.textContent = '✗ Invalid key format'; akStatus.style.color='var(--red)'; return;
+    }
+    ANTHROPIC_KEY = key;
+    localStorage.setItem('zig_api_key', key);
+    akStatus.textContent = '✓ Key saved — Zig is ready'; akStatus.style.color='var(--green)';
+    showToast('API key saved — Zig is live ✦');
   });
 
   const logout = document.getElementById('logout-btn');
@@ -1939,6 +1970,7 @@ async function doLookup(){
   const el=document.getElementById('lq-result');
   el.innerHTML=`<div style="padding:.75rem;color:var(--muted)"><span class="spin"></span>Searching Canton Fair for "${q}"...</div>`;
   try{
+    if(!ANTHROPIC_KEY){ el.innerHTML='<div class="al al-r">⚠ No API key — go to ⚙ Options tab and add your Anthropic key.</div>'; return; }
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
@@ -1948,6 +1980,7 @@ async function doLookup(){
         messages:[{role:'user',content:'Canton Fair 2026 Hall 10.1 hardware exhibitors for: '+q+'. Known context: Liliwise (10.1 B27-28, smart locks), MVM Hardware (10.1 C45-46), Raider Lock (10.1 G35-36), Oubou (10.1 C33-34), Spark (10.1 H36).'}]
       })
     });
+    if(!res.ok){ const err=await res.json(); el.innerHTML='<div class="al al-r">API error '+res.status+': '+(err.error?.message||'check your API key in ⚙ Options')+'</div>'; return; }
     const data=await res.json();
     const text=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
     let parsed;try{parsed=JSON.parse(text.replace(/\`\`\`json|\`\`\`/g,'').trim());}catch(e){parsed=null;}
@@ -1985,6 +2018,7 @@ async function optimiseRoute(){
   el.innerHTML='<div style="color:var(--muted)"><span class="spin"></span>Calculating optimal route...</div>';
   
   const boothList=pending.map(s=>`${s.name} — ${s.booth}`).join('\n');
+  if(!ANTHROPIC_KEY){ addZM('zig','⚠ No API key. Go to ⚙ Options tab and add your Anthropic key to activate Zig.'); return; }
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
