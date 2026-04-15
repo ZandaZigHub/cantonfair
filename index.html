@@ -825,7 +825,13 @@ textarea.fi{resize:vertical;min-height:60px}
 </div><!-- /app -->
 
 <!-- ZIG FLOATING BUTTON + PANEL -->
-<button id="zig-fab" onclick="toggleZig()" title="Zig — AI Assistant">⚡</button>
+<button id="zig-fab" onclick="toggleZig()" title="Zig — AI Assistant">
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 4L20.5 16H17.8L14 9.2L10.2 16H7.5L14 4Z" fill="white"/>
+    <path d="M7 16.8H21V19.2H7V16.8Z" fill="white" opacity="0.7"/>
+    <path d="M9.5 19.2H12.5L14 22.5L15.5 19.2H18.5L14 24L9.5 19.2Z" fill="white" opacity="0.85"/>
+  </svg>
+</button>
 <div id="zig-panel">
   <div class="zig-header">
     <div class="zig-title">Zig</div>
@@ -873,10 +879,10 @@ const OPENAI_KEY  = ''; // Optional: OpenAI key for Whisper transcription
 
 const APP_PASSWORD = 'cantonfair2026';
 const USERS = {
-  BW: { name:'Brent Wallis',  initials:'BW', color:'#bab28f', textColor:'#2a2e3c', role:'Guangzhou',  email:'brent.w@zanda.com.au' },
-  GW: { name:'Greg Wallis',   initials:'GW', color:'#2d5a8e', textColor:'#ffffff', role:'Guangzhou',  email:'greg.w@zanda.com.au' },
-  AC: { name:'Acacia Wallis', initials:'AW', color:'#296366', textColor:'#ffffff', role:'Perth HQ',   email:'acacia.w@zanda.com.au' },
-  PT: { name:'Poppy Trewarn', initials:'PT', color:'#6b3fa0', textColor:'#ffffff', role:'Perth HQ',   email:'poppy.t@zanda.com.au' }
+  BW: { name:'Brent Wallis',  initials:'BWW', color:'#bab28f', textColor:'#2a2e3c', role:'Guangzhou',  email:'brent.w@zanda.com.au' },
+  GW: { name:'Greg Wallis',   initials:'GTW', color:'#2d5a8e', textColor:'#ffffff', role:'Guangzhou',  email:'greg.w@zanda.com.au' },
+  AC: { name:'Acacia Wallis', initials:'ABW', color:'#296366', textColor:'#ffffff', role:'Perth HQ',   email:'acacia.w@zanda.com.au' },
+  PT: { name:'Poppy Trewarn', initials:'PIT', color:'#6b3fa0', textColor:'#ffffff', role:'Perth HQ',   email:'poppy.t@zanda.com.au' }
 };
 
 // Message channels: who can see what
@@ -956,9 +962,7 @@ function setSyncStatus(status) {
 // ════════════════════════════════════════════════════════
 // LOGIN — PIN PAD
 // ════════════════════════════════════════════════════════
-const USER_PINS = { BW:'2606', GW:'1706', AC:'1706', PT:'1706' };
-// BW = Brent: 2606 (26 June — Vaughan's due month, easy to remember)
-// GW/AC/PT = 1706 (17 June — trip return date, easy to share)
+const USER_PINS = { BW:'1589', GW:'8266', AC:'4966', PT:'5825' };
 
 let pinEntry = '';
 
