@@ -337,26 +337,26 @@ textarea.fi{resize:vertical;min-height:60px}
       <div style="font-size:.7rem;color:var(--muted);font-family:'DM Sans',sans-serif;margin-top:.2rem">Canton Fair 2026</div>
     </div>
     <div class="user-grid" id="user-grid">
-      <button class="user-btn" onclick="selectUser('BW',this)">
+      <button class="user-btn" onclick="selectUser('BW',this)" ontouchstart="event.preventDefault();selectUser('BW',this)">
         <span class="user-btn-name">Brent Wallis</span>
         <span class="user-btn-role">🇨🇳 Guangzhou</span>
       </button>
-      <button class="user-btn" onclick="selectUser('GW',this)">
+      <button class="user-btn" onclick="selectUser('GW',this)" ontouchstart="event.preventDefault();selectUser('GW',this)">
         <span class="user-btn-name">Greg Wallis</span>
         <span class="user-btn-role">🇨🇳 Guangzhou</span>
       </button>
-      <button class="user-btn" onclick="selectUser('AC',this)">
+      <button class="user-btn" onclick="selectUser('AC',this)" ontouchstart="event.preventDefault();selectUser('AC',this)">
         <span class="user-btn-name">Acacia Wallis</span>
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
       </button>
-      <button class="user-btn" onclick="selectUser('PT',this)">
+      <button class="user-btn" onclick="selectUser('PT',this)" ontouchstart="event.preventDefault();selectUser('PT',this)">
         <span class="user-btn-name">Poppy Trewarn</span>
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
       </button>
     </div>
     <div class="pw-row">
       <input class="pw-input" type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="login-btn" style="width:auto;padding:.7rem 1.25rem" onclick="doLogin()">→</button>
+      <button class="login-btn" style="width:auto;padding:.7rem 1.25rem" onclick="doLogin()" ontouchstart="event.preventDefault();doLogin()">→</button>
     </div>
     <div class="le" id="le"></div>
     <div style="font-size:.65rem;color:var(--dim);margin-top:.75rem">Shared password · All users</div>
@@ -938,16 +938,33 @@ function selectUser(uid, el) {
   document.getElementById('pw-input').focus();
 }
 function doLogin() {
-  const pw = document.getElementById('pw-input').value.trim();
+  const pwEl = document.getElementById('pw-input');
   const errEl = document.getElementById('le');
-  if (!pw) { errEl.textContent = 'Enter the password.'; errEl.style.color='var(--red)'; return; }
-  if (pw !== APP_PASSWORD) { errEl.textContent = 'Incorrect password.'; errEl.style.color='var(--red)'; document.getElementById('pw-input').value=''; document.getElementById('pw-input').focus(); return; }
-  if (!selectedUserForLogin) { 
-    // Highlight user buttons to indicate selection needed
-    errEl.textContent = 'Select your name above.'; errEl.style.color='var(--red)';
-    document.querySelectorAll('.user-btn').forEach(b => { b.style.animation='pulse-border .4s ease 3'; });
-    return; 
+  // Read value multiple ways to defeat autofill weirdness
+  let pw = pwEl.value;
+  if (!pw) pw = pwEl.getAttribute('value') || '';
+  pw = pw.trim();
+
+  errEl.style.color = 'var(--red)';
+
+  if (!selectedUserForLogin) {
+    errEl.textContent = 'Tap your name first ↑';
+    document.querySelectorAll('.user-btn').forEach(b => { b.style.outline='2px solid var(--red)'; setTimeout(()=>b.style.outline='',1200); });
+    return;
   }
+  if (!pw) {
+    errEl.textContent = 'Enter the password.';
+    pwEl.focus();
+    return;
+  }
+  if (pw !== APP_PASSWORD) {
+    errEl.textContent = 'Wrong password — try again.';
+    pwEl.value = '';
+    pwEl.focus();
+    return;
+  }
+  // Success
+  errEl.textContent = '';
   currentUser = selectedUserForLogin;
   lsSet('user', currentUser);
   launch();
