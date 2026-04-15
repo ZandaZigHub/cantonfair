@@ -494,13 +494,25 @@ textarea.fi{resize:vertical;min-height:60px}
 
     <div class="card" style="margin-top:1.25rem">
       <div class="ct">Haggle Calculator</div>
-      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem">Enter supplier quote in USD. We calculate our landed cost equivalent in USD (AUD cost ÷ FX rate × 0.85 to strip duty/freight/tax) to see if the deal stacks up.</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem">Enter supplier quote in USD vs our AUD landed cost. Strips 15% duty/freight/tax to get raw equivalent USD. Shows if the deal stacks up.</div>
       <div id="fx-row" style="font-size:.78rem;color:var(--muted);margin-bottom:.65rem">Exchange rate: loading...</div>
-      <div class="fl2">
-        <div class="fg"><label class="flabel">Supplier quote (USD)</label><input class="fi" id="hc-q" type="number" placeholder="0.00" id="hc-q"></div>
+      <div class="fl2" style="margin-bottom:.65rem">
+        <div class="fg"><label class="flabel">Supplier quote (USD)</label><input class="fi" id="hc-q" type="number" placeholder="0.00"></div>
         <div class="fg"><label class="flabel">Our cost (AUD)</label><input class="fi" id="hc-c" type="number" placeholder="0.00"></div>
       </div>
-      <div id="hc-r" style="margin-top:.65rem"></div>
+      <div id="hc-r" style="margin-bottom:.65rem"></div>
+      <div style="border-top:1px solid var(--border);padding-top:.65rem;margin-top:.25rem">
+        <div class="flabel" style="margin-bottom:.35rem">Upload Zanda price list (CSV or Excel)</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:.4rem">Upload your exported price list to auto-populate AUD costs when you type a product code.</div>
+        <input type="file" id="pl-upload" accept=".csv,.xlsx,.xls" style="display:none">
+        <button class="btn btn-s btn-g" id="pl-btn">📋 Upload Price List</button>
+        <span id="pl-status" style="font-size:.72rem;color:var(--muted);margin-left:.5rem"></span>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <input class="fi" id="pl-code" placeholder="Type product code..." style="flex:1">
+          <button class="btn btn-s btn-p" id="pl-lookup-btn">Look up</button>
+        </div>
+        <div id="pl-result" style="margin-top:.35rem;font-size:.78rem"></div>
+      </div>
     </div>
   </div>
 
@@ -634,6 +646,53 @@ textarea.fi{resize:vertical;min-height:60px}
         </button>
       </div>
       <input type="file" id="photo-in" accept="image/*" capture="environment" style="display:none">
+    </div>
+  </div>
+
+
+  <!-- OPTIONS TAB -->
+  <div class="tab" id="tab-options">
+    <div class="al al-b" style="margin-bottom:.75rem">⚙ These settings sync instantly to all users via Supabase. Acacia can update suppliers, hit list, and push announcements from Perth in real time.</div>
+
+    <!-- Announcement banner -->
+    <div class="card card-gold" style="margin-bottom:.75rem">
+      <div class="ct">📢 Broadcast Announcement</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.65rem">Push a real-time message visible to all users at top of every tab. Use for urgent updates, schedule changes, or instructions.</div>
+      <div class="fg"><textarea class="fi" id="ann-text" rows="2" placeholder="e.g. Change of plan — meet at hotel lobby 3pm. Brent call Greg now."></textarea></div>
+      <div style="display:flex;gap:.4rem">
+        <button class="btn btn-p" id="ann-send-btn" style="flex:1">📢 Broadcast Now</button>
+        <button class="btn btn-r" id="ann-clear-btn">Clear</button>
+      </div>
+      <div id="ann-preview" style="display:none;margin-top:.5rem" class="al al-a"></div>
+    </div>
+
+    <!-- Suppliers edit -->
+    <div class="card" style="margin-bottom:.75rem">
+      <div class="ct">Supplier Management</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.65rem">Add, edit or update supplier details remotely. Changes sync immediately to Brent and Greg's app.</div>
+      <button class="btn btn-g btn-full" onclick="showTab('suppliers')">→ Go to Suppliers tab</button>
+    </div>
+
+    <!-- Hit list edit -->
+    <div class="card" style="margin-bottom:.75rem">
+      <div class="ct">Hit List Management</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.65rem">Add urgent items, reprioritise, or mark things done remotely.</div>
+      <button class="btn btn-g btn-full" onclick="showTab('hitlist')">→ Go to Hit List tab</button>
+    </div>
+
+    <!-- Notes / instructions -->
+    <div class="card" style="margin-bottom:.75rem">
+      <div class="ct">📋 Shared Notes</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.5rem">Persistent notes visible to all. Acacia can add prep notes, product specs, instructions, or reminders.</div>
+      <textarea class="fi" id="shared-notes" rows="6" placeholder="Type notes here — auto-saved and synced to all users..."></textarea>
+      <button class="btn btn-p btn-full" id="notes-save-btn" style="margin-top:.4rem">Save Notes</button>
+    </div>
+
+    <!-- Logout -->
+    <div class="card">
+      <div class="ct">Session</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.65rem">Logged in as <strong id="opt-user-name"></strong></div>
+      <button class="btn btn-r" id="logout-btn">Log out</button>
     </div>
   </div>
 
@@ -859,11 +918,13 @@ function startSync(){
           // Mark as delivered
           m.delivered=true;
           // If this chat is open, mark as read by us
-          if(currentChatId&&m.chatId===currentChatId){
+          // Only mark read if this exact chat is open AND visible
+          const chatTab = document.getElementById('tab-comms');
+          const chatViewOpen = document.getElementById('comms-chat-view') && document.getElementById('comms-chat-view').style.display !== 'none';
+          if(currentChatId && m.chatId===currentChatId && chatTab && chatTab.classList.contains('on') && chatViewOpen){
             if(!m.readBy)m.readBy=[];
             if(!m.readBy.includes(currentUser))m.readBy.push(currentUser);
             m.read=true;
-            // Push read receipt back to Supabase
             SB.upsert('cf_messages',{id:String(m.id),data:JSON.stringify(m),created_at:m.ts});
           }
         });
@@ -889,6 +950,20 @@ function startSync(){
       presData.forEach(r=>{if(new Date(r.updated_at).getTime()>threshold)onlineUsers[r.user_id]=true;});
       renderOnline();
     }
+    // Sync settings (announcements, shared notes)
+    const settingsData = await SB.get('cf_settings','');
+    if(settingsData) settingsData.forEach(row=>{
+      if(row.key==='announcement'&&row.value!==announcement){
+        announcement=row.value; lsSet('announcement',announcement);
+        if(announcement) showAnnouncement(announcement);
+        else hideAnnouncement();
+      }
+      if(row.key==='shared_notes'){
+        lsSet('shared_notes',row.value);
+        const notesEl=document.getElementById('shared-notes');
+        if(notesEl&&document.activeElement!==notesEl) notesEl.value=row.value;
+      }
+    });
     lastSyncTs=now;
   },4000);
 }
@@ -1192,12 +1267,13 @@ async function sendMsg(){
 }
 
 async function pushMsg(data){
-  const msg={id:Date.now(),uid:currentUser,ts:new Date().toISOString(),read:false,delivered:true,readBy:[currentUser],...data};
+  const msg={id:Date.now(),uid:currentUser,ts:new Date().toISOString(),read:false,delivered:false,readBy:[currentUser],...data};
   messages.push(msg);lsSet('msgs',messages);
   const chat=getChat(data.chatId);
   if(chat){chat.lastMsg=data.txt||'📷 Photo';chat.lastTs=msg.ts;lsSet('chats',chats);}
   renderMessages();scrollMsgBot();
-  await SB.upsert('cf_messages',{id:String(msg.id),data:JSON.stringify(msg),created_at:msg.ts});
+  const ok = await SB.upsert('cf_messages',{id:String(msg.id),data:JSON.stringify(msg),created_at:msg.ts});
+  if(ok){ msg.delivered=true; lsSet('msgs',messages); renderMessages(); }
 }
 
 function handlePhoto(e){
@@ -1607,6 +1683,163 @@ function renderMeetings(){
   el.querySelectorAll('[data-del-id]').forEach(b=>b.addEventListener('click',()=>deleteMeeting(Number(b.dataset.delId))));
 }
 
+
+
+// ══════════════════════════════════════════
+// OPTIONS
+// ══════════════════════════════════════════
+let announcement = lsGet('announcement', '');
+
+function initOptions(){
+  const u = USERS[currentUser];
+  const nameEl = document.getElementById('opt-user-name');
+  if(nameEl) nameEl.textContent = u ? u.name : currentUser;
+
+  // Load shared notes
+  const notesEl = document.getElementById('shared-notes');
+  if(notesEl) notesEl.value = lsGet('shared_notes','');
+
+  // Load current announcement
+  if(announcement){
+    showAnnouncement(announcement);
+    const prev = document.getElementById('ann-preview');
+    const textEl = document.getElementById('ann-text');
+    if(prev){ prev.style.display='block'; prev.textContent = announcement; }
+    if(textEl) textEl.value = announcement;
+  }
+
+  const annSend = document.getElementById('ann-send-btn');
+  if(annSend) annSend.addEventListener('click', async ()=>{
+    const txt = document.getElementById('ann-text').value.trim();
+    if(!txt) return;
+    announcement = txt; lsSet('announcement', txt);
+    await SB.upsert('cf_settings',{key:'announcement',value:txt,updated_at:new Date().toISOString()});
+    showAnnouncement(txt);
+    const prev = document.getElementById('ann-preview');
+    if(prev){ prev.style.display='block'; prev.textContent = txt; }
+    showToast('Broadcast sent to all users');
+  });
+
+  const annClear = document.getElementById('ann-clear-btn');
+  if(annClear) annClear.addEventListener('click', async ()=>{
+    announcement=''; lsSet('announcement','');
+    await SB.upsert('cf_settings',{key:'announcement',value:'',updated_at:new Date().toISOString()});
+    hideAnnouncement();
+    const textEl = document.getElementById('ann-text');
+    if(textEl) textEl.value='';
+    const prev = document.getElementById('ann-preview');
+    if(prev) prev.style.display='none';
+    showToast('Announcement cleared');
+  });
+
+  const notesSave = document.getElementById('notes-save-btn');
+  if(notesSave) notesSave.addEventListener('click', async ()=>{
+    const txt = document.getElementById('shared-notes').value;
+    lsSet('shared_notes', txt);
+    await SB.upsert('cf_settings',{key:'shared_notes',value:txt,updated_at:new Date().toISOString()});
+    showToast('Notes saved and synced');
+  });
+
+  const logout = document.getElementById('logout-btn');
+  if(logout) logout.addEventListener('click', ()=>{
+    lsSet('user',null); currentUser=null;
+    document.getElementById('app').style.display='none';
+    document.getElementById('login').style.display='flex';
+    document.getElementById('zig-fab').style.display='none';
+  });
+}
+
+function showAnnouncement(txt){
+  if(!txt) return;
+  let bar = document.getElementById('ann-bar');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id='ann-bar';
+    bar.style.cssText='background:#8a6d20;color:#fff;padding:.5rem 1rem;font-size:.8rem;font-family:Montserrat;font-weight:600;text-align:center;cursor:pointer;position:sticky;top:104px;z-index:98;';
+    bar.onclick=()=>bar.style.display='none';
+    const nav = document.querySelector('.nav');
+    if(nav) nav.insertAdjacentElement('afterend', bar);
+  }
+  bar.textContent = '📢 '+txt+' (tap to dismiss)';
+  bar.style.display='block';
+}
+
+function hideAnnouncement(){
+  const bar = document.getElementById('ann-bar');
+  if(bar) bar.style.display='none';
+}
+
+// ══════════════════════════════════════════
+// PRICE LIST UPLOAD
+// ══════════════════════════════════════════
+let priceList = lsGet('pricelist', {});
+
+function initPriceList(){
+  const plBtn = document.getElementById('pl-btn');
+  const plUpload = document.getElementById('pl-upload');
+  const plLookup = document.getElementById('pl-lookup-btn');
+  const plCode = document.getElementById('pl-code');
+  if(plBtn) plBtn.addEventListener('click', ()=>plUpload.click());
+  if(plUpload) plUpload.addEventListener('change', handlePriceListUpload);
+  if(plLookup) plLookup.addEventListener('click', lookupPriceCode);
+  if(plCode) plCode.addEventListener('keydown', e=>{ if(e.key==='Enter') lookupPriceCode(); });
+  updatePLStatus();
+}
+
+function updatePLStatus(){
+  const count = Object.keys(priceList).length;
+  const el = document.getElementById('pl-status');
+  if(el) el.textContent = count ? count.toLocaleString()+' products loaded' : 'No price list loaded';
+}
+
+function handlePriceListUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const status = document.getElementById('pl-status');
+  if(status) status.textContent = 'Parsing...';
+  
+  const reader = new FileReader();
+  
+  if(file.name.endsWith('.csv')){
+    reader.onload = ev => {
+      const lines = ev.target.result.split('\n');
+      const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,'').toLowerCase());
+      const codeIdx = headers.findIndex(h=>h.includes('code')||h.includes('no.')||h.includes('sku')||h==='no');
+      const costIdx = headers.findIndex(h=>h.includes('cost')||h.includes('price')||h.includes('unit cost'));
+      const descIdx = headers.findIndex(h=>h.includes('desc'));
+      if(codeIdx<0||costIdx<0){ if(status) status.textContent='Could not find Code/Cost columns'; return; }
+      priceList = {};
+      lines.slice(1).forEach(line=>{
+        const cols = line.split(',').map(c=>c.trim().replace(/"/g,''));
+        const code = cols[codeIdx]; const cost = parseFloat(cols[costIdx]);
+        if(code && !isNaN(cost)) priceList[code.toUpperCase()] = {cost, desc: descIdx>=0?cols[descIdx]:''};
+      });
+      lsSet('pricelist', priceList);
+      updatePLStatus();
+    };
+    reader.readAsText(file);
+  } else {
+    // For xlsx - use simple binary parse (basic)
+    if(status) status.textContent = 'For Excel files, export as CSV first and re-upload.';
+  }
+  e.target.value = '';
+}
+
+function lookupPriceCode(){
+  const code = (document.getElementById('pl-code')?.value||'').trim().toUpperCase();
+  const el = document.getElementById('pl-result');
+  if(!code||!el) return;
+  const match = priceList[code] || Object.entries(priceList).find(([k])=>k.startsWith(code))?.[1];
+  const matchCode = priceList[code] ? code : Object.keys(priceList).find(k=>k.startsWith(code));
+  if(match){
+    var costVal = match.cost.toFixed(2);
+    el.innerHTML = '<div class="al al-g">'+matchCode+': '+match.desc+' — <strong>AUD $'+costVal+'</strong> <button class="btn btn-s btn-ok" id="pl-use-btn">Use this</button></div>';
+    var useBtn = el.querySelector('#pl-use-btn');
+    if(useBtn) useBtn.addEventListener('click', function(){ document.getElementById('hc-c').value=costVal; calcH(); });
+  } else {
+    el.innerHTML = '<div style="color:var(--muted)">Code not found in uploaded price list.</div>';
+  }
+}
+
 // ══════════════════════════════════════════
 // GPS LOCATION
 // ══════════════════════════════════════════
@@ -1711,9 +1944,8 @@ async function doLookup(){
       headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',max_tokens:800,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        system:'You are a Canton Fair 2026 Phase 1 exhibitor search assistant. Search for exhibitors at Canton Fair 2026 Phase 1 (April 15-19, Guangzhou, Hall 10.1 hardware). Return ONLY valid JSON: {"results":[{"name":"Company","booth":"Hall X.X BoothXX","products":"brief description","tip":"1 buying tip"}],"summary":"2 sentences"}. 3-6 results. No markdown, just JSON.',
-        messages:[{role:'user',content:`Canton Fair 2026 Phase 1 Hall 10.1 hardware exhibitors: ${q}`}]
+        system:'You are a Canton Fair hardware exhibitor expert. The user is searching Canton Fair 2026 Phase 1 Hall 10.1 (architectural hardware, door hardware, locks). Return ONLY valid JSON, no markdown, no explanation: {"results":[{"name":"Company name","booth":"10.1 XXX","products":"what they make","tip":"one buying tip"}],"summary":"2 sentences about this product category at Canton Fair"}. Give 3-5 realistic results based on your knowledge of Chinese hardware manufacturers who exhibit at Canton Fair. If unsure of exact booth, say TBC.',
+        messages:[{role:'user',content:'Canton Fair 2026 Hall 10.1 hardware exhibitors for: '+q+'. Known context: Liliwise (10.1 B27-28, smart locks), MVM Hardware (10.1 C45-46), Raider Lock (10.1 G35-36), Oubou (10.1 C33-34), Spark (10.1 H36).'}]
       })
     });
     const data=await res.json();
@@ -1921,6 +2153,9 @@ document.addEventListener('DOMContentLoaded', function() {
   loadFX();
   initComms();
   initZig();
+  initLocation();
+  initPriceList();
+  initOptions();
 
   var u = lsGet('user', null);
   if (u && USERS[u]) { currentUser = u; setTimeout(launch, 50); }
