@@ -1827,14 +1827,7 @@ const DEFAULT_HIT=[
   {id:20,name:"New 54mm deadbolt",notes:"",priority:"med",cat:"Product",done:false},
 ];
 </script>
-<script>
-// Products loaded from external file
-let productData = [];
-fetch('products.js')
-  .then(r => r.text())
-  .then(t => { eval(t); productData = typeof PRODUCT_DB !== 'undefined' ? PRODUCT_DB : []; })
-  .catch(() => console.log('Products not loaded'));
-</script>
+<script src="products.js"></script>
 
 <!-- ZIG FLOATING ASSISTANT -->
 <button id="zig-fab" onclick="toggleZig()" title="Ask Zig">✦</button>
