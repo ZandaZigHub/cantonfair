@@ -339,19 +339,19 @@ textarea.fi{resize:vertical;min-height:60px}
       <div style="font-size:.7rem;color:var(--muted);font-family:'DM Sans',sans-serif;margin-top:.2rem">Canton Fair 2026</div>
     </div>
     <div class="user-grid" id="user-grid">
-      <button class="user-btn" onclick="selectUser('BW',this)" ontouchstart="event.preventDefault();selectUser('BW',this)">
+      <button class="user-btn" id="ubtn-BW">
         <span class="user-btn-name">Brent Wallis</span>
         <span class="user-btn-role">🇨🇳 Guangzhou</span>
       </button>
-      <button class="user-btn" onclick="selectUser('GW',this)" ontouchstart="event.preventDefault();selectUser('GW',this)">
+      <button class="user-btn" id="ubtn-GW">
         <span class="user-btn-name">Greg Wallis</span>
         <span class="user-btn-role">🇨🇳 Guangzhou</span>
       </button>
-      <button class="user-btn" onclick="selectUser('AC',this)" ontouchstart="event.preventDefault();selectUser('AC',this)">
+      <button class="user-btn" id="ubtn-AC">
         <span class="user-btn-name">Acacia Wallis</span>
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
       </button>
-      <button class="user-btn" onclick="selectUser('PT',this)" ontouchstart="event.preventDefault();selectUser('PT',this)">
+      <button class="user-btn" id="ubtn-PT">
         <span class="user-btn-name">Poppy Trewarn</span>
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
       </button>
@@ -368,18 +368,18 @@ textarea.fi{resize:vertical;min-height:60px}
     </div>
     <!-- PIN pad -->
     <div id="pin-pad" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.6rem">
-      <button class="pin-key" onclick="pinKey('1')">1</button>
-      <button class="pin-key" onclick="pinKey('2')">2</button>
-      <button class="pin-key" onclick="pinKey('3')">3</button>
-      <button class="pin-key" onclick="pinKey('4')">4</button>
-      <button class="pin-key" onclick="pinKey('5')">5</button>
-      <button class="pin-key" onclick="pinKey('6')">6</button>
-      <button class="pin-key" onclick="pinKey('7')">7</button>
-      <button class="pin-key" onclick="pinKey('8')">8</button>
-      <button class="pin-key" onclick="pinKey('9')">9</button>
-      <button class="pin-key pin-del" onclick="pinDel()" style="font-size:1rem">⌫</button>
-      <button class="pin-key" onclick="pinKey('0')">0</button>
-      <button class="pin-key pin-go" onclick="pinGo()" style="background:var(--navy);color:#fff;border-color:var(--navy)">→</button>
+      <button class="pin-key" id="pk1">1</button>
+      <button class="pin-key" id="pk2">2</button>
+      <button class="pin-key" id="pk3">3</button>
+      <button class="pin-key" id="pk4">4</button>
+      <button class="pin-key" id="pk5">5</button>
+      <button class="pin-key" id="pk6">6</button>
+      <button class="pin-key" id="pk7">7</button>
+      <button class="pin-key" id="pk8">8</button>
+      <button class="pin-key" id="pk9">9</button>
+      <button class="pin-key" id="pkdel" style="font-size:1rem">⌫</button>
+      <button class="pin-key" id="pk0">0</button>
+      <button class="pin-key" id="pkgo" style="background:var(--navy);color:#fff;border-color:var(--navy)">→</button>
     </div>
     <div class="le" id="le"></div>
   </div>
@@ -957,35 +957,30 @@ function setSyncStatus(status) {
 }
 
 // ════════════════════════════════════════════════════════
-// LOGIN
-// ════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════
-// LOGIN — PIN PAD
+// LOGIN — PIN PAD (wired via addEventListener, no inline handlers)
 // ════════════════════════════════════════════════════════
 const USER_PINS = { BW:'1589', GW:'8266', AC:'4966', PT:'5825' };
-
 let pinEntry = '';
 
-function selectUser(uid, el) {
+function selectUser(uid) {
   selectedUserForLogin = uid;
   document.querySelectorAll('.user-btn').forEach(b => b.classList.remove('sel'));
-  el.classList.add('sel');
+  const btn = document.getElementById('ubtn-'+uid);
+  if (btn) btn.classList.add('sel');
   pinEntry = '';
   updatePinDots();
   document.getElementById('le').textContent = '';
 }
 
 function pinKey(d) {
-  if (pinEntry.length >= 4) return;
   if (!selectedUserForLogin) {
-    const le = document.getElementById('le');
-    le.textContent = 'Tap your name first ↑';
-    document.querySelectorAll('.user-btn').forEach(b => { b.style.outline='2px solid var(--red)'; setTimeout(()=>b.style.outline='',1000); });
+    document.getElementById('le').textContent = 'Tap your name first ↑';
     return;
   }
+  if (pinEntry.length >= 4) return;
   pinEntry += d;
   updatePinDots();
-  if (pinEntry.length === 4) setTimeout(pinGo, 120);
+  if (pinEntry.length === 4) setTimeout(pinGo, 150);
 }
 
 function pinDel() {
@@ -996,24 +991,14 @@ function pinDel() {
 
 function pinGo() {
   const le = document.getElementById('le');
-  if (!selectedUserForLogin) {
-    le.textContent = 'Tap your name first ↑';
-    return;
-  }
-  if (pinEntry.length < 4) {
-    le.textContent = 'Enter 4-digit PIN.';
-    return;
-  }
+  if (!selectedUserForLogin) { le.textContent = 'Tap your name first ↑'; return; }
+  if (pinEntry.length < 4) { le.textContent = 'Enter 4 digits.'; return; }
   if (pinEntry !== USER_PINS[selectedUserForLogin]) {
     le.textContent = 'Wrong PIN — try again.';
     pinEntry = '';
     updatePinDots();
-    // Shake effect
-    const pad = document.getElementById('pin-dots');
-    pad.style.transform='translateX(-8px)';setTimeout(()=>pad.style.transform='translateX(8px)',80);setTimeout(()=>pad.style.transform='',160);
     return;
   }
-  le.textContent = '';
   currentUser = selectedUserForLogin;
   lsSet('user', currentUser);
   launch();
@@ -1022,17 +1007,30 @@ function pinGo() {
 function updatePinDots() {
   for (let i = 0; i < 4; i++) {
     const d = document.getElementById('pd'+i);
-    if (i < pinEntry.length) {
-      d.style.background = 'var(--navy)';
-      d.style.borderColor = 'var(--navy)';
-    } else {
-      d.style.background = '#fff';
-      d.style.borderColor = 'var(--border)';
-    }
+    if (!d) return;
+    d.style.background = i < pinEntry.length ? 'var(--navy)' : '#fff';
+    d.style.borderColor = i < pinEntry.length ? 'var(--navy)' : 'var(--border)';
   }
 }
 
-function doLogin() { pinGo(); } // legacy fallback
+function doLogin() { pinGo(); }
+
+// Wire up all login buttons after DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+  ['BW','GW','AC','PT'].forEach(uid => {
+    const b = document.getElementById('ubtn-'+uid);
+    if (b) b.addEventListener('click', function() { selectUser(uid); });
+  });
+  [1,2,3,4,5,6,7,8,9,0].forEach(n => {
+    const b = document.getElementById('pk'+n);
+    if (b) b.addEventListener('click', function() { pinKey(String(n)); });
+  });
+  const del = document.getElementById('pkdel');
+  if (del) del.addEventListener('click', pinDel);
+  const go = document.getElementById('pkgo');
+  if (go) go.addEventListener('click', pinGo);
+});
+
 (function(){ const u=lsGet('user',null); if(u&&USERS[u]){ currentUser=u; setTimeout(launch,50); } })();
 
 // ════════════════════════════════════════════════════════
