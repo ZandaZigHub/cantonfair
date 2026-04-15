@@ -271,7 +271,7 @@ textarea.fi{resize:vertical;min-height:60px}
 .lc2{background:var(--bg);border-radius:var(--rs);padding:.75rem;text-align:center;flex:1;border:1.5px solid var(--border)}
 
 /* ── ZIG AI ASSISTANT ── */
-#zig-fab{position:fixed;bottom:1.5rem;right:1.25rem;z-index:500;width:52px;height:52px;border-radius:50%;background:var(--zig);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(26,127,90,.45);transition:all .2s;font-size:1.3rem}
+#zig-fab{position:fixed;bottom:1.5rem;right:1.25rem;z-index:500;width:52px;height:52px;border-radius:50%;background:var(--zig);border:none;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(26,127,90,.45);transition:all .2s;font-size:1.3rem}
 #zig-fab:hover{background:var(--zig-dk);transform:scale(1.05)}
 #zig-fab.active{background:var(--navy)}
 #zig-panel{position:fixed;bottom:5.5rem;right:1rem;width:calc(100vw - 2rem);max-width:400px;z-index:499;background:#fff;border:1.5px solid var(--border);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);display:none;flex-direction:column;max-height:70vh}
@@ -1037,6 +1037,7 @@ function doLogin() { pinGo(); } // legacy fallback
 function launch() {
   document.getElementById('login').style.display = 'none';
   const app = document.getElementById('app'); app.style.display='flex'; app.style.flexDirection='column';
+  document.getElementById('zig-fab').style.display = 'flex';
   const u = USERS[currentUser];
   const av = document.getElementById('user-av');
   av.textContent = u.initials;
