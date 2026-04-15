@@ -26,12 +26,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 /* ── LOGIN ── */
 #login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy);padding:1.5rem}
 .lc{background:#fff;border-radius:18px;padding:2.5rem 2rem;width:100%;max-width:340px;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.25)}
-.logo-wrap{margin-bottom:1.5rem}
-.logo-z{font-family:'Montserrat',sans-serif;font-size:2rem;font-weight:800;color:var(--navy);letter-spacing:1px;text-transform:uppercase;line-height:1}
-.logo-bar{width:36px;height:3px;background:var(--gold);border-radius:2px;margin:.35rem auto .1rem}
-.logo-sub{font-size:.6rem;color:var(--muted);letter-spacing:3px;text-transform:uppercase;font-family:'Montserrat',sans-serif}
+
 .user-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.25rem}
-.user-btn{padding:.75rem .5rem;border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;transition:.15s;text-align:center;background:var(--bg)}
+.user-btn{padding:.75rem .5rem;border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;transition:.15s;text-align:center;background:var(--bg);width:100%;font-family:inherit}
 .user-btn:hover{border-color:var(--gold);background:var(--gold-lt)}
 .user-btn.sel{border-color:var(--navy);background:var(--navy);color:#fff}
 .user-btn-name{font-family:'Montserrat',sans-serif;font-weight:700;font-size:.78rem;display:block}
@@ -335,28 +332,27 @@ textarea.fi{resize:vertical;min-height:60px}
 <!-- ═══ LOGIN ═══ -->
 <div id="login">
   <div class="lc">
-    <div class="logo-wrap">
-      <div class="logo-z">Zanda</div>
-      <div class="logo-bar"></div>
-      <div class="logo-sub">Canton Fair 2026</div>
+    <div style="margin-bottom:1.5rem">
+      <div style="font-family:'Montserrat',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);letter-spacing:.5px">Zanda</div>
+      <div style="font-size:.7rem;color:var(--muted);font-family:'DM Sans',sans-serif;margin-top:.2rem">Canton Fair 2026</div>
     </div>
     <div class="user-grid" id="user-grid">
-      <div class="user-btn" onclick="selectUser('BW',this)">
+      <button class="user-btn" onclick="selectUser('BW',this)">
         <span class="user-btn-name">Brent Wallis</span>
         <span class="user-btn-role">🇨🇳 Guangzhou</span>
-      </div>
-      <div class="user-btn" onclick="selectUser('GW',this)">
+      </button>
+      <button class="user-btn" onclick="selectUser('GW',this)">
         <span class="user-btn-name">Greg Wallis</span>
         <span class="user-btn-role">🇨🇳 Guangzhou</span>
-      </div>
-      <div class="user-btn" onclick="selectUser('AC',this)">
+      </button>
+      <button class="user-btn" onclick="selectUser('AC',this)">
         <span class="user-btn-name">Acacia Wallis</span>
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
-      </div>
-      <div class="user-btn" onclick="selectUser('PT',this)">
+      </button>
+      <button class="user-btn" onclick="selectUser('PT',this)">
         <span class="user-btn-name">Poppy Trewarn</span>
         <span class="user-btn-role">🇦🇺 Perth HQ</span>
-      </div>
+      </button>
     </div>
     <div class="pw-row">
       <input class="pw-input" type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
@@ -942,9 +938,16 @@ function selectUser(uid, el) {
   document.getElementById('pw-input').focus();
 }
 function doLogin() {
-  const pw = document.getElementById('pw-input').value;
-  if (!selectedUserForLogin) { document.getElementById('le').textContent = 'Select your name first.'; return; }
-  if (pw !== APP_PASSWORD) { document.getElementById('le').textContent = 'Incorrect password.'; return; }
+  const pw = document.getElementById('pw-input').value.trim();
+  const errEl = document.getElementById('le');
+  if (!pw) { errEl.textContent = 'Enter the password.'; errEl.style.color='var(--red)'; return; }
+  if (pw !== APP_PASSWORD) { errEl.textContent = 'Incorrect password.'; errEl.style.color='var(--red)'; document.getElementById('pw-input').value=''; document.getElementById('pw-input').focus(); return; }
+  if (!selectedUserForLogin) { 
+    // Highlight user buttons to indicate selection needed
+    errEl.textContent = 'Select your name above.'; errEl.style.color='var(--red)';
+    document.querySelectorAll('.user-btn').forEach(b => { b.style.animation='pulse-border .4s ease 3'; });
+    return; 
+  }
   currentUser = selectedUserForLogin;
   lsSet('user', currentUser);
   launch();
