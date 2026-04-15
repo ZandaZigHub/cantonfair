@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Canton Fair">
+    <link rel="manifest" href="data:application/json,{%22name%22:%22Canton Fair 2026%22,%22short_name%22:%22Canton Fair%22,%22display%22:%22standalone%22,%22background_color%22:%22%23383d4f%22,%22theme_color%22:%22%23383d4f%22}">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23383d4f'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='serif'>🐉</text></svg>">
+
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Canton Fair 2026 — Zanda</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet">
@@ -271,6 +278,16 @@ textarea.fi{resize:vertical;min-height:60px}
 .zig-tin:focus{outline:none;border-color:#1a7f5a;background:#fff}
 .zig-tin::placeholder{color:var(--dim)}
 .zig-sb{width:34px;height:34px;border-radius:50%;background:#1a7f5a;border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;flex-shrink:0}
+
+/* MEETINGS */
+.meeting-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:.75rem}
+.rec-status{display:flex;align-items:center;gap:.75rem;padding:.875rem;background:var(--red-bg);border:1.5px solid var(--red-bd);border-radius:var(--r);margin-bottom:.75rem}
+.rec-pulse{width:12px;height:12px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.action-item{display:flex;align-items:flex-start;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem}
+.action-item:last-child{border:none}
+.ack{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.6rem;color:transparent;transition:.2s}
+.ack.on{background:var(--green);border-color:var(--green);color:#fff}
 </style>
 </head>
 <body>
@@ -324,6 +341,7 @@ textarea.fi{resize:vertical;min-height:60px}
     <div class="nt" id="nav-products" onclick="showTab('products')">Products</div>
     <div class="nt" id="nav-locate" onclick="showTab('locate')">📍 Locate</div>
     <div class="nt" id="nav-lookup" onclick="showTab('lookup')">🔍 Lookup</div>
+    <div class="nt" id="nav-meetings" onclick="showTab('meetings')">🎙 Meetings</div>
     <div class="nt" id="nav-comms" onclick="showTab('comms')">💬 Comms</div>
   </div>
 
@@ -519,6 +537,38 @@ textarea.fi{resize:vertical;min-height:60px}
     </div>
   </div>
 
+  <!-- MEETINGS TAB -->
+  <div class="tab" id="tab-meetings">
+    <div class="sh"><div class="st">Vendor Meetings</div><button class="btn btn-s btn-g" id="mtg-new-btn">+ New Meeting</button></div>
+
+    <!-- Recording status bar -->
+    <div id="rec-status-bar" class="rec-status" style="display:none">
+      <div class="rec-pulse"></div>
+      <div style="flex:1">
+        <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:.82rem;color:var(--red)" id="rec-sup-name">Recording...</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--red);opacity:.8" id="rec-elapsed">0:00</div>
+      </div>
+      <button class="btn btn-s btn-r" id="rec-discard">Discard</button>
+      <button class="btn btn-s btn-ok" id="rec-stop">Stop & Process</button>
+    </div>
+
+    <div id="mtg-processing" class="al al-a" style="display:none"><span class="spin"></span>Processing with Zig — extracting action items...</div>
+
+    <!-- New meeting form -->
+    <div class="af" id="mtg-form">
+      <div class="fg"><label class="flabel">Supplier</label><select class="fi" id="mtg-supplier"><option value="">Select supplier...</option></select></div>
+      <div class="fg"><label class="flabel">Contact name</label><input class="fi" id="mtg-contact" placeholder="e.g. Nolar Liao"></div>
+      <div class="fg"><label class="flabel">Pre-notes (optional)</label><textarea class="fi" id="mtg-prenotes" rows="2" placeholder="Key things to discuss..."></textarea></div>
+      <div class="frow">
+        <button class="btn btn-p" id="mtg-start-rec" style="flex:1">🎤 Start Recording</button>
+        <button class="btn" id="mtg-cancel">Cancel</button>
+      </div>
+    </div>
+
+    <div id="mtg-list"></div>
+    <div class="al al-b" style="font-size:.78rem;margin-top:.5rem">🎙 Recording uses your device microphone. Zig transcribes and extracts action items automatically (requires API key). Without it, tap ✏ to type notes manually.</div>
+  </div>
+
   <!-- COMMS TAB -->
   <div class="tab" id="tab-comms">
     <!-- Chat list view -->
@@ -582,6 +632,7 @@ textarea.fi{resize:vertical;min-height:60px}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
+const ANTHROPIC_KEY = ''; // ← PASTE YOUR sk-ant-... KEY HERE
 const SUPA_URL  = 'https://tusbnuhmdhwggcsnxumd.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c2JudWhtZGh3Z2djc254dW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjE4MDYsImV4cCI6MjA5MTc5NzgwNn0.d57PdqCDt_0PthKzyZRqK_Mqefz5CX216A9iB-twxVU';
 
@@ -1227,7 +1278,7 @@ When a user pastes an email, silently extract supplier details and add them with
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
       body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:500,system:sysPrompt,messages:zigHistory.slice(-8)})
     });
     const data=await res.json();
@@ -1263,10 +1314,191 @@ async function execZigAction(a){
 
 
 
+
+// ══════════════════════════════════════════
+// MEETINGS
+// ══════════════════════════════════════════
+function initMeetings(){
+  meetings = lsGet('meetings',[]);
+  const nb=document.getElementById('mtg-new-btn');
+  if(nb) nb.addEventListener('click',()=>{
+    // Populate supplier dropdown
+    const sel=document.getElementById('mtg-supplier');
+    sel.innerHTML='<option value="">Select supplier...</option>';
+    suppliers.forEach(s=>{const o=document.createElement('option');o.value=s.name;o.textContent=s.name+(s.booth?' — '+s.booth:'');sel.appendChild(o);});
+    document.getElementById('mtg-form').classList.add('open');
+  });
+  const mc=document.getElementById('mtg-cancel');
+  if(mc) mc.addEventListener('click',()=>document.getElementById('mtg-form').classList.remove('open'));
+  const sr=document.getElementById('mtg-start-rec');
+  if(sr) sr.addEventListener('click',startMeetingRec);
+  const rd=document.getElementById('rec-discard');
+  if(rd) rd.addEventListener('click',()=>stopMeeting(false));
+  const rs=document.getElementById('rec-stop');
+  if(rs) rs.addEventListener('click',()=>stopMeeting(true));
+  renderMeetings();
+}
+
+function startMeetingRec(){
+  const supplier=document.getElementById('mtg-supplier').value;
+  const contact=document.getElementById('mtg-contact').value.trim();
+  const prenotes=document.getElementById('mtg-prenotes').value.trim();
+  if(!supplier){showToast('Select a supplier first');return;}
+
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    // No mic — create manual entry
+    createManualMeeting(supplier,contact,prenotes);return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    meetingChunks=[];meetingElapsed=0;
+    meetingRec=new MediaRecorder(stream);
+    meetingRec.ondataavailable=e=>{if(e.data.size>0)meetingChunks.push(e.data);};
+    meetingRec.start(200);
+    activeMeeting={supplier,contact,prenotes,startTs:new Date().toISOString(),user:currentUser};
+    document.getElementById('rec-sup-name').textContent='● '+supplier+(contact?' · '+contact:'');
+    document.getElementById('rec-status-bar').style.display='flex';
+    meetingTimer=setInterval(()=>{
+      meetingElapsed++;
+      const el=document.getElementById('rec-elapsed');
+      if(el)el.textContent=Math.floor(meetingElapsed/60)+':'+String(meetingElapsed%60).padStart(2,'0');
+    },1000);
+    document.getElementById('mtg-form').classList.remove('open');
+    ['mtg-supplier','mtg-contact','mtg-prenotes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  }).catch(()=>createManualMeeting(supplier,contact,prenotes));
+}
+
+function createManualMeeting(supplier,contact,prenotes){
+  const m={id:Date.now(),supplier,contact,prenotes,ts:new Date().toISOString(),transcript:'',summary:'',actions:[],duration:'0:00',user:currentUser};
+  meetings.unshift(m);saveMeetings();
+  document.getElementById('mtg-form').classList.remove('open');
+  renderMeetings();
+  setTimeout(()=>editMeetingNotes(m.id),300);
+}
+
+async function stopMeeting(save){
+  clearInterval(meetingTimer);
+  document.getElementById('rec-status-bar').style.display='none';
+  if(!save||!activeMeeting){
+    if(meetingRec){meetingRec.stop();meetingRec.stream?.getTracks().forEach(t=>t.stop());}
+    meetingRec=null;meetingChunks=[];activeMeeting=null;return;
+  }
+  const dur=Math.floor(meetingElapsed/60)+':'+String(meetingElapsed%60).padStart(2,'0');
+  if(meetingRec){await new Promise(r=>{meetingRec.onstop=r;meetingRec.stop();});meetingRec.stream?.getTracks().forEach(t=>t.stop());}
+  const m={id:Date.now(),supplier:activeMeeting.supplier,contact:activeMeeting.contact,prenotes:activeMeeting.prenotes,ts:activeMeeting.startTs,duration:dur,transcript:'',summary:'',actions:[],user:currentUser,processing:true};
+  meetings.unshift(m);saveMeetings();renderMeetings();activeMeeting=null;
+
+  if(meetingChunks.length&&ANTHROPIC_KEY){
+    const proc=document.getElementById('mtg-processing');if(proc)proc.style.display='flex';
+    try{
+      // Use Zig to transcribe via base64 audio description + extract actions
+      const blob=new Blob(meetingChunks,{type:'audio/webm'});
+      // Convert to base64
+      const b64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(blob);});
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
+        body:JSON.stringify({
+          model:'claude-haiku-4-5-20251001',max_tokens:800,
+          system:'You are a Canton Fair meeting analyst for Zanda Architectural Hardware. Given a meeting audio (base64 webm), transcribe it and return ONLY valid JSON: {"transcript":"full text","summary":"2-3 sentences on products discussed, prices, MOQs, outcomes","actions":[{"text":"action item","owner":"BW or GW or SUPPLIER","done":false}]}',
+          messages:[{role:'user',content:[{type:'text',text:'Supplier: '+m.supplier+', Contact: '+(m.contact||'unknown')+'. Transcribe this meeting audio and extract action items.'},{type:'document',source:{type:'base64',media_type:'audio/webm',data:b64}}]}]
+        })
+      });
+      const data=await res.json();
+      const text=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+      try{
+        const parsed=JSON.parse(text.replace(/\`\`\`json|\`\`\`/g,'').trim());
+        m.transcript=parsed.transcript||'';m.summary=parsed.summary||'';m.actions=(parsed.actions||[]).map((a,i)=>({...a,id:i}));
+      }catch(e){m.transcript='[Transcription failed — tap ✏ to type notes manually]';}
+      m.processing=false;
+    }catch(e){m.transcript='[Error — tap ✏ to type notes]';m.processing=false;}
+    const proc=document.getElementById('mtg-processing');if(proc)proc.style.display='none';
+  } else if(!ANTHROPIC_KEY){
+    m.transcript='[Add API key for auto-transcription — tap ✏ to type notes]';m.processing=false;
+  } else {
+    m.transcript='[No audio captured]';m.processing=false;
+  }
+  meetingChunks=[];saveMeetings();renderMeetings();
+}
+
+function editMeetingNotes(id){
+  const m=meetings.find(x=>x.id===id);if(!m)return;
+  const t=prompt('Meeting notes / transcript:',m.transcript||'');
+  if(t!==null){
+    m.transcript=t;
+    if(t&&!m.actions.length&&ANTHROPIC_KEY) extractActions(m).then(()=>{saveMeetings();renderMeetings();});
+    saveMeetings();renderMeetings();
+  }
+}
+
+async function extractActions(m){
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',max_tokens:500,
+        system:'Zanda Hardware Canton Fair. Return ONLY JSON: {"summary":"2-3 sentences","actions":[{"text":"action","owner":"BW or GW or SUPPLIER","done":false}]}',
+        messages:[{role:'user',content:'Supplier: '+m.supplier+'\nNotes: '+m.transcript}]
+      })
+    });
+    const data=await res.json();
+    const text=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+    const parsed=JSON.parse(text.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    m.summary=parsed.summary||'';m.actions=(parsed.actions||[]).map((a,i)=>({...a,id:i}));
+  }catch(e){}
+}
+
+function toggleAction(mid,aid){
+  const m=meetings.find(x=>x.id===mid);if(!m)return;
+  const a=m.actions.find(x=>x.id===aid);if(!a)return;
+  a.done=!a.done;saveMeetings();renderMeetings();
+}
+
+function deleteMeeting(id){
+  if(!confirm('Delete this meeting?'))return;
+  meetings=meetings.filter(m=>m.id!==id);saveMeetings();renderMeetings();
+}
+
+function saveMeetings(){
+  lsSet('meetings',meetings);
+  SB.upsert('cf_meetings',{id:String(meetings[0]?.id),data:JSON.stringify(meetings[0]),created_at:meetings[0]?.ts}).catch(()=>{});
+}
+
+function renderMeetings(){
+  const el=document.getElementById('mtg-list');if(!el)return;
+  if(!meetings.length){el.innerHTML='<div class="empty">No meetings yet.<br><span style="font-size:.78rem">Tap + New Meeting before each vendor discussion.</span></div>';return;}
+  const ownerColor=o=>o==='BW'?'var(--gold-dk)':o==='GW'?'var(--blue)':'var(--green)';
+  el.innerHTML=meetings.map(m=>{
+    const date=new Date(m.ts).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const doneCount=(m.actions||[]).filter(a=>a.done).length;
+    const totalCount=(m.actions||[]).length;
+    return `<div class="meeting-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.2rem">
+        <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:.9rem;color:var(--navy)">${m.supplier}</div>
+        <span class="b ${doneCount===totalCount&&totalCount>0?'bg':'ba'}">${totalCount?doneCount+'/'+totalCount+' done':'no actions'}</span>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);margin-bottom:.35rem">${date} · ${m.duration||'0:00'}${m.contact?' · '+m.contact:''}</div>
+      ${m.prenotes?`<div style="font-size:.77rem;color:var(--muted);font-style:italic;margin-bottom:.35rem">${m.prenotes}</div>`:''}
+      ${m.processing?`<div class="al al-a" style="font-size:.78rem"><span class="spin"></span>Processing...</div>`:''}
+      ${m.summary?`<div style="font-size:.82rem;background:var(--blue-bg);border:1px solid var(--blue-bd);border-radius:var(--rs);padding:.5rem .7rem;margin-bottom:.5rem;color:var(--blue)">${m.summary}</div>`:''}
+      ${m.transcript&&!m.processing?`<div style="background:var(--bg);border-radius:var(--rs);padding:.65rem;font-size:.8rem;line-height:1.65;max-height:140px;overflow-y:auto;margin-bottom:.5rem;border:1px solid var(--border);white-space:pre-wrap">${m.transcript}</div>`:''}
+      ${totalCount?`<div class="st" style="margin-bottom:.35rem">Actions</div><div>${(m.actions||[]).map(a=>`<div class="action-item"><div class="ack ${a.done?'on':''}" data-mid="${m.id}" data-aid="${a.id}">✓</div><div style="flex:1;${a.done?'opacity:.4;text-decoration:line-through':''}">${a.text}</div><span class="b" style="font-size:.6rem;background:var(--bg);color:${ownerColor(a.owner)};border:1px solid var(--border)">${a.owner}</span></div>`).join('')}</div>`:''}
+      <div style="display:flex;gap:.4rem;margin-top:.5rem">
+        <button class="btn btn-s" data-edit-id="${m.id}">✏ Notes</button>
+        <button class="btn btn-s btn-r" data-del-id="${m.id}">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-mid]').forEach(b=>b.addEventListener('click',()=>toggleAction(Number(b.dataset.mid),Number(b.dataset.aid))));
+  el.querySelectorAll('[data-edit-id]').forEach(b=>b.addEventListener('click',()=>editMeetingNotes(Number(b.dataset.editId))));
+  el.querySelectorAll('[data-del-id]').forEach(b=>b.addEventListener('click',()=>deleteMeeting(Number(b.dataset.delId))));
+}
+
 // ══════════════════════════════════════════
 // GPS LOCATION
 // ══════════════════════════════════════════
 let myLoc=null, allLocs={}, locInterval=null;
+let meetings=[], activeMeeting=null, meetingRec=null, meetingChunks=[], meetingElapsed=0, meetingTimer=null;
 
 function initLocation(){
   // Load existing locations
@@ -1314,15 +1546,21 @@ function renderLocGrid(){
   const el=document.getElementById('loc-grid');if(!el)return;
   el.innerHTML=Object.keys(USERS).map(uid=>{
     const u=USERS[uid],loc=allLocs[uid];
+    const isMe=uid===currentUser;
     const age=loc?Math.round((Date.now()-new Date(loc.updated_at).getTime())/60000):null;
     const live=loc&&age<2;
-    return `<div style="background:var(--bg);border-radius:var(--rs);padding:.65rem;text-align:center;border:1.5px solid var(--border)">
-      <div style="width:32px;height:32px;border-radius:50%;background:${u.color};color:${u.text};display:flex;align-items:center;justify-content:center;font-family:Montserrat;font-weight:700;font-size:.62rem;margin:0 auto .3rem">${u.initials}</div>
-      <div style="font-size:.82rem;font-weight:600">${u.name.split(' ')[0]}</div>
-      <div class="mono" style="font-size:.62rem;color:var(--muted);margin-top:.15rem">${loc?parseFloat(loc.lat).toFixed(3)+', '+parseFloat(loc.lng).toFixed(3):'—'}</div>
-      <div style="margin-top:.3rem"><span class="b ${live?'bg':'ba'}">${live?'Live':age!==null?age+'m ago':'Offline'}</span></div>
-      ${loc?`<a href="https://maps.google.com/?q=${loc.lat},${loc.lng}" target="_blank" class="btn btn-s" style="text-decoration:none;margin-top:.35rem;display:inline-flex">🗺</a>`:''}
-    </div>`;
+    const border=isMe?'2px solid var(--navy)':'1.5px solid var(--border)';
+    const bg=isMe?'var(--gold-lt)':'var(--bg)';
+    return '<div style="background:'+bg+';border-radius:var(--rs);padding:.65rem;text-align:center;border:'+border+'">'
+      +'<div style="width:32px;height:32px;border-radius:50%;background:'+u.color+';color:'+u.text+';display:flex;align-items:center;justify-content:center;font-family:Montserrat;font-weight:700;font-size:.62rem;margin:0 auto .3rem">'+u.initials+'</div>'
+      +'<div style="font-size:.82rem;font-weight:600">'+u.name.split(' ')[0]+(isMe?' (you)':'')+'</div>'
+      +(loc?'<div class="mono" style="font-size:.62rem;color:var(--muted);margin-top:.1rem">'+parseFloat(loc.lat).toFixed(4)+', '+parseFloat(loc.lng).toFixed(4)+'</div>':'<div style="font-size:.72rem;color:var(--dim);margin-top:.1rem">No location</div>')
+      +'<div style="margin-top:.3rem"><span class="b '+(live?'bg':'ba')+'">'+(live?'Live':age!==null?age+'m ago':'Offline')+'</span></div>'
+      +(loc?'<div style="display:flex;gap:.3rem;justify-content:center;margin-top:.35rem">'
+        +'<a href="https://maps.google.com/?q='+loc.lat+','+loc.lng+'" target="_blank" class="btn btn-s" style="text-decoration:none;font-size:.6rem">📍 Maps</a>'
+        +(isMe?'':'<a href="https://maps.google.com/?daddr='+loc.lat+','+loc.lng+'&dirflg=w" target="_blank" class="btn btn-s btn-p" style="text-decoration:none;font-size:.6rem">Navigate</a>')
+        +'</div>':'')
+      +'</div>';
   }).join('');
 }
 
@@ -1357,7 +1595,7 @@ async function doLookup(){
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',max_tokens:800,
         tools:[{type:'web_search_20250305',name:'web_search'}],
@@ -1405,7 +1643,7 @@ async function optimiseRoute(){
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',max_tokens:600,
         system:'You are a Canton Fair route planner. Hall 10.1 has rows A-H, booths numbered within each row. Optimise the visit sequence to minimise backtracking. Provide a numbered list with supplier name, booth, and a one-line reason for the order. Be concise.',
@@ -1543,6 +1781,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // GPS
   initLocation();
+  // MEETINGS
+  initMeetings();
 
   // AUTO-LOGIN
   const u=lsGet('user',null);
