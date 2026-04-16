@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zanda — Recover Data</title>
+<style>
+body{font-family:sans-serif;padding:1rem;background:#f5f5f3;color:#383d4f}
+h2{margin-bottom:1rem}
+.card{background:#fff;border-radius:10px;padding:1rem;margin-bottom:.75rem;border:1.5px solid #e0ddd9}
+.btn{padding:.75rem 1.25rem;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:1rem;width:100%;margin-bottom:.5rem}
+.bp{background:#383d4f;color:#fff}
+.bg{background:#296366;color:#fff}
+.br{background:#b94040;color:#fff}
+pre{font-size:.7rem;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;background:#f5f5f3;padding:.5rem;border-radius:6px}
+#status{padding:.75rem;border-radius:8px;margin-bottom:.75rem;font-weight:600;display:none}
+</style>
+</head>
+<body>
+<h2>🔧 Zanda Data Recovery</h2>
+<div id="status"></div>
+
+<div class="card">
+  <strong>Step 1</strong> — Scan all localStorage keys on this device<br>
+  <small style="color:#7a7a7a">This reads everything stored by the Canton Fair app</small><br><br>
+  <button class="btn bp" onclick="scanAll()">🔍 Scan localStorage Now</button>
+</div>
+
+<div class="card" id="results" style="display:none">
+  <strong>Found data:</strong>
+  <div id="data-display"></div>
+</div>
+
+<div class="card" id="upload-card" style="display:none">
+  <strong>Step 2</strong> — Push to Supabase so the main app can see it<br><br>
+  <button class="btn bg" onclick="uploadAll()">☁ Upload All to Supabase</button>
+</div>
+
+<script>
+const SUPA_URL = 'https://tusbnuhmdhwggcsnxumd.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c2JudWhtZGh3Z2djc254dW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjE4MDYsImV4cCI6MjA5MTc5NzgwNn0.d57PdqCDt_0PthKzyZRqK_Mqefz5CX216A9iB-twxVU';
+
+let allMeetings = [];
+let allSuppliers = [];
+let allHitlist = [];
+
+function setStatus(msg, color){
+  const el = document.getElementById('status');
+  el.style.display = 'block';
+  el.style.background = color === 'green' ? '#eaf3f3' : color === 'red' ? '#fdf0f0' : '#fdf8ee';
+  el.style.color = color === 'green' ? '#296366' : color === 'red' ? '#b94040' : '#8a6d20';
+  el.style.border = '1.5px solid ' + (color === 'green' ? '#a0cccc' : color === 'red' ? '#e0a0a0' : '#d4c47a');
+  el.textContent = msg;
+}
+
+function scanAll(){
+  allMeetings = [];
+  allSuppliers = [];
+  allHitlist = [];
+  
+  const display = document.getElementById('data-display');
+  let html = '';
+  
+  // Scan ALL localStorage keys
+  for(let i = 0; i < localStorage.length; i++){
+    const key = localStorage.key(i);
+    try{
+      const val = JSON.parse(localStorage.getItem(key));
+      
+      // Check for meetings arrays
+      if(Array.isArray(val) && val.length && val[0].supplier){
+        allMeetings = [...allMeetings, ...val.filter(m => m.id && m.supplier)];
+        html += `<div style="margin:.4rem 0;color:#296366">✓ Meetings (${val.length}) found in key: <code>${key}</code></div>`;
+      }
+      // Check for suppliers
+      if(Array.isArray(val) && val.length && val[0].meet_type){
+        allSuppliers = [...allSuppliers, ...val];
+        html += `<div style="margin:.4rem 0;color:#296366">✓ Suppliers (${val.length}) found in key: <code>${key}</code></div>`;
+      }
+      // Check for hitlist
+      if(Array.isArray(val) && val.length && val[0].priority){
+        allHitlist = [...allHitlist, ...val];
+        html += `<div style="margin:.4rem 0;color:#296366">✓ Hit list (${val.length}) found in key: <code>${key}</code></div>`;
+      }
+    } catch(e){}
+  }
+  
+  // Dedup meetings by id
+  const seen = new Set();
+  allMeetings = allMeetings.filter(m => { if(seen.has(m.id)) return false; seen.add(m.id); return true; });
+  
+  if(!allMeetings.length && !allSuppliers.length && !allHitlist.length){
+    html = '<div style="color:#b94040">No Canton Fair data found in localStorage on this device.<br><br>The data may have been cleared when the browser updated, or it may be on a different device/browser.</div>';
+    setStatus('No data found', 'red');
+  } else {
+    setStatus(`Found: ${allMeetings.length} meetings · ${allSuppliers.length} suppliers · ${allHitlist.length} hit list items`, 'green');
+    document.getElementById('upload-card').style.display = 'block';
+    
+    // Show meeting summaries
+    if(allMeetings.length){
+      html += '<div style="margin-top:.75rem;font-weight:700">Meetings found:</div>';
+      allMeetings.forEach(m => {
+        html += `<div style="padding:.35rem 0;border-bottom:1px solid #e0ddd9;font-size:.85rem"><strong>${m.supplier}</strong> · ${new Date(m.ts).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${m.duration||'0:00'}${m.transcript ? ' · has transcript' : ''}</div>`;
+      });
+    }
+  }
+  
+  display.innerHTML = html;
+  document.getElementById('results').style.display = 'block';
+}
+
+async function uploadAll(){
+  const btn = document.querySelector('#upload-card .btn');
+  btn.textContent = 'Uploading...';
+  btn.disabled = true;
+  
+  let ok = 0, fail = 0;
+  
+  // Upload meetings
+  for(const m of allMeetings){
+    const payload = {...m};
+    delete payload.photos;
+    delete payload.photo;
+    try{
+      const r = await fetch(`${SUPA_URL}/rest/v1/cf_meetings`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Prefer':'resolution=merge-duplicates'},
+        body: JSON.stringify({id:String(m.id), data:JSON.stringify(payload), updated_at: new Date().toISOString()})
+      });
+      if(r.ok) ok++; else fail++;
+    } catch(e){ fail++; }
+  }
+  
+  // Upload suppliers
+  for(const s of allSuppliers){
+    try{
+      await fetch(`${SUPA_URL}/rest/v1/cf_suppliers`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Prefer':'resolution=merge-duplicates'},
+        body: JSON.stringify({id:String(s.id), data:JSON.stringify(s), updated_at: new Date().toISOString()})
+      });
+    } catch(e){}
+  }
+
+  btn.textContent = '☁ Upload All to Supabase';
+  btn.disabled = false;
+  
+  if(ok > 0){
+    setStatus(`✓ Uploaded ${ok} meetings to Supabase. Open the main app and check Meetings tab.`, 'green');
+  } else {
+    setStatus('Upload failed — check your connection and try again.', 'red');
+  }
+}
+</script>
+</body>
+</html>
