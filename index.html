@@ -552,7 +552,7 @@ textarea.fi{resize:vertical;min-height:60px}
 
   <!-- MEETINGS TAB -->
   <div class="tab" id="tab-meetings">
-    <div class="sh"><div class="st">Vendor Meetings</div><button class="btn btn-s btn-g" id="mtg-new-btn">+ New Meeting</button></div>
+    <div class="sh"><div class="st">Vendor Meetings</div><div style="display:flex;gap:.35rem"><button class="btn btn-s btn-p" id="mtg-backup-btn">☁ Backup</button><button class="btn btn-s btn-g" id="mtg-new-btn">+ New</button></div></div>
 
     <!-- Active recording bar -->
     <div id="rec-status-bar" class="rec-status" style="display:none">
@@ -590,23 +590,22 @@ textarea.fi{resize:vertical;min-height:60px}
         <input class="fi" id="mtg-contact" placeholder="e.g. Nolar Liao">
       </div>
       <div class="fg">
-        <label class="flabel">Booth photo (optional)</label>
-        <div style="display:flex;gap:.5rem;align-items:center">
-          <button class="btn btn-s" id="mtg-photo-btn">📷 Take photo</button>
-          <span id="mtg-photo-label" style="font-size:.75rem;color:var(--muted)">No photo</span>
+        <label class="flabel">Photos — booth, products, business card (tap + to add more)</label>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.35rem" id="mtg-photo-strip">
+          <button class="btn btn-s" id="mtg-photo-btn" style="height:54px;width:54px;font-size:1.2rem">📷</button>
         </div>
-        <img id="mtg-photo-preview" src="" style="display:none;width:100%;max-width:200px;border-radius:var(--rs);margin-top:.4rem;border:1.5px solid var(--border)">
-        <input type="file" id="mtg-photo-input" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="mtg-photo-input" accept="image/*" capture="environment" style="display:none" multiple>
+        <div style="font-size:.7rem;color:var(--muted)">Zig will scan business cards automatically</div>
       </div>
       <div class="fg">
         <label class="flabel">Agenda / key objectives</label>
         <textarea class="fi" id="mtg-prenotes" rows="3" placeholder="e.g. Price on euro cylinder range, MOQ, sample lead time, exclusivity options, DDA compliance..."></textarea>
       </div>
       <div class="frow">
-        <button class="btn btn-p" id="mtg-start-rec" style="flex:1">🎤 Start Recording</button>
-        <button class="btn" id="mtg-cancel">Cancel</button>
+        <button class="btn btn-p" id="mtg-start-rec" style="flex:1">🎤 Record</button>
+        <button class="btn" id="mtg-cancel">✕</button>
       </div>
-      <div style="font-size:.72rem;color:var(--muted);margin-top:.4rem">Live speech-to-text via your browser. Keep screen on — use Wake Lock button in recording bar. Zig extracts action items when you stop.</div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:.3rem">Screen stays on during recording. Zig extracts action items when done.</div>
     </div>
 
     <div id="mtg-list"></div>
@@ -1468,14 +1467,38 @@ async function execZigAction(a){
 // MEETINGS — Web Speech API + Wake Lock
 // ══════════════════════════════════════════
 let meetings=[], activeMeeting=null, speechRec=null, liveTranscript='', wakeLock=null;
-let meetingElapsed=0, meetingTimer=null, meetingPhoto=null;
+let meetingElapsed=0, meetingTimer=null, meetingPhotos=[];
 
-function initMeetings(){
+async function initMeetings(){
   meetings=lsGet('meetings',[]);
   renderMeetings();
+  // Also fetch from Supabase to catch any meetings from other sessions
+  try{
+    const data = await SB.get('cf_meetings','limit=100');
+    if(data&&data.length){
+      const remote = data.map(r=>{
+        const m=JSON.parse(r.data);
+        // Restore photos from localStorage
+        const photos = lsGet('mtg_photos_'+m.id,[]);
+        if(photos.length) m.photos=photos;
+        return m;
+      });
+      // Merge remote into local — remote wins for newer records
+      remote.forEach(rm=>{
+        const idx=meetings.findIndex(m=>m.id===rm.id);
+        if(idx>=0){if(new Date(rm.ts)>=new Date(meetings[idx].ts))meetings[idx]=rm;}
+        else meetings.push(rm);
+      });
+      meetings.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+      lsSet('meetings',meetings);
+      renderMeetings();
+    }
+  }catch(e){}
 }
 
 function setupMeetingsListeners(){
+  const bb=document.getElementById('mtg-backup-btn');
+  if(bb) bb.addEventListener('click',backupAllMeetings);
   const nb=document.getElementById('mtg-new-btn');
   if(nb) nb.addEventListener('click',()=>{
     const sel=document.getElementById('mtg-supplier');
@@ -1502,15 +1525,68 @@ function setupMeetingsListeners(){
 }
 
 function handleMtgPhoto(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    meetingPhoto=ev.target.result;
-    document.getElementById('mtg-photo-preview').src=meetingPhoto;
-    document.getElementById('mtg-photo-preview').style.display='block';
-    document.getElementById('mtg-photo-label').textContent='Photo attached ✓';
-  };
-  reader.readAsDataURL(file);e.target.value='';
+  const files=Array.from(e.target.files);if(!files.length)return;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      meetingPhotos.push(ev.target.result);
+      renderMtgPhotoStrip();
+      // Auto-scan business cards with Zig
+      if(meetingPhotos.length===1) scanBusinessCard(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value='';
+}
+
+function renderMtgPhotoStrip(){
+  const strip=document.getElementById('mtg-photo-strip');
+  if(!strip)return;
+  strip.innerHTML=meetingPhotos.map((ph,i)=>`
+    <div style="position:relative;width:54px;height:54px;border-radius:6px;overflow:hidden;border:1.5px solid var(--border)">
+      <img src="${ph}" style="width:100%;height:100%;object-fit:cover">
+      <button onclick="meetingPhotos.splice(${i},1);renderMtgPhotoStrip()" style="position:absolute;top:1px;right:1px;width:16px;height:16px;background:var(--red);border-radius:50%;border:none;color:#fff;font-size:.6rem;cursor:pointer;line-height:1">×</button>
+    </div>`).join('')
+    +'<button class="btn btn-s" id="mtg-photo-btn" style="height:54px;width:54px;font-size:1.2rem">📷+</button>';
+  document.getElementById('mtg-photo-btn').addEventListener('click',()=>document.getElementById('mtg-photo-input').click());
+}
+
+async function scanBusinessCard(photoData){
+  // Try to extract business card details via Zig proxy
+  try{
+    const res=await fetch('https://tusbnuhmdhwggcsnxumd.supabase.co/functions/v1/zig-proxy',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',max_tokens:300,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:photoData.split(',')[1]||photoData}},
+          {type:'text',text:'If this is a business card or product photo, extract: company name, contact name, email, phone, products/services. Return JSON: {"company":"","contact":"","email":"","phone":"","products":""}. If not a business card, return {"company":"","contact":"","email":"","phone":"","products":""}'}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    const text=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    if(parsed.company){
+      // Auto-fill form fields
+      const supField=document.getElementById('mtg-adhoc');
+      const contactField=document.getElementById('mtg-contact');
+      const supSel=document.getElementById('mtg-supplier');
+      if(supSel&&parsed.company){
+        // Check if in supplier list
+        const match=suppliers.find(s=>s.name.toLowerCase().includes(parsed.company.toLowerCase()));
+        if(match){supSel.value=match.name;}
+        else{supSel.value='__adhoc__';document.getElementById('adhoc-row').style.display='block';if(supField)supField.value=parsed.company;}
+      }
+      if(contactField&&parsed.contact&&!contactField.value) contactField.value=parsed.contact;
+      if(parsed.products){
+        const notes=document.getElementById('mtg-prenotes');
+        if(notes&&!notes.value) notes.value=parsed.products;
+      }
+      showToast('📇 Business card scanned: '+parsed.company);
+    }
+  }catch(e){}
 }
 
 function startMeetingRec(){
@@ -1541,10 +1617,9 @@ function startMeetingRec(){
 
   liveTranscript='';
   meetingElapsed=0;
-  activeMeeting={supplier:supplierName,contact,prenotes,photo:meetingPhoto,startTs:new Date().toISOString(),user:currentUser};
-  meetingPhoto=null;
-  document.getElementById('mtg-photo-preview').style.display='none';
-  document.getElementById('mtg-photo-label').textContent='No photo';
+  activeMeeting={supplier:supplierName,contact,prenotes,photos:[...meetingPhotos],startTs:new Date().toISOString(),user:currentUser};
+  meetingPhotos=[];
+  renderMtgPhotoStrip();
 
   // Start speech recognition
   speechRec=new SpeechRecognition();
@@ -1552,23 +1627,42 @@ function startMeetingRec(){
   speechRec.interimResults=true;
   speechRec.lang='en-AU';
 
+  // Dedup transcript — Android Chrome repeats phrases on restart
   let finalTranscript='';
+  let lastResultIdx=0;
   speechRec.onresult=e=>{
     let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) finalTranscript+=e.results[i][0].transcript+' ';
-      else interim+=e.results[i][0].transcript;
+    // Only process NEW results since last restart
+    for(let i=Math.max(e.resultIndex,lastResultIdx);i<e.results.length;i++){
+      if(e.results[i].isFinal){
+        const phrase=e.results[i][0].transcript.trim()+' ';
+        // Dedup: don't add if last 60 chars already contains this phrase
+        if(!finalTranscript.slice(-80).includes(phrase.trim())){
+          finalTranscript+=phrase;
+        }
+        lastResultIdx=i+1;
+      } else {
+        interim+=e.results[i][0].transcript;
+      }
     }
     liveTranscript=finalTranscript;
     const box=document.getElementById('live-transcript-box');
-    if(box) box.innerHTML=finalTranscript+'<span style="color:var(--muted)">'+interim+'</span>';
+    if(box) box.innerHTML=finalTranscript+'<span style="color:var(--muted);font-style:italic">'+interim+'</span>';
   };
   speechRec.onerror=e=>{
+    if(e.error==='not-allowed'){showToast('Mic blocked — allow microphone access');return;}
     if(e.error!=='no-speech') showToast('Mic: '+e.error);
   };
   speechRec.onend=()=>{
-    // Auto-restart if still recording (browser stops after ~60s)
-    if(activeMeeting) speechRec.start();
+    if(activeMeeting){
+      // Small delay before restart to avoid rapid loop
+      setTimeout(()=>{
+        if(activeMeeting){
+          lastResultIdx=0; // reset index on restart
+          try{speechRec.start();}catch(e){}
+        }
+      },300);
+    }
   };
   speechRec.start();
 
@@ -1600,8 +1694,9 @@ function releaseWakeLock(){
 }
 
 function createManualMeeting(supplier,contact,prenotes){
-  const m={id:Date.now(),supplier,contact,prenotes,photo:meetingPhoto,ts:new Date().toISOString(),transcript:'',summary:'',actions:[],duration:'0:00',user:currentUser};
-  meetingPhoto=null;
+  const m={id:Date.now(),supplier,contact,prenotes,photos:[...meetingPhotos],ts:new Date().toISOString(),transcript:'',summary:'',actions:[],duration:'0:00',user:currentUser};
+  meetingPhotos=[];
+  renderMtgPhotoStrip();
   meetings.unshift(m);saveMeetings();
   document.getElementById('mtg-form').classList.remove('open');
   renderMeetings();
@@ -1624,7 +1719,7 @@ async function stopMeeting(save){
     supplier:activeMeeting.supplier,
     contact:activeMeeting.contact,
     prenotes:activeMeeting.prenotes,
-    photo:activeMeeting.photo,
+    photos:activeMeeting.photos||[],
     ts:activeMeeting.startTs,
     duration:dur,
     transcript:liveTranscript.trim()||'[No speech detected — tap ✏ to add notes]',
@@ -1685,7 +1780,48 @@ function deleteMeeting(id){
   meetings=meetings.filter(m=>m.id!==id);saveMeetings();renderMeetings();
 }
 
-function saveMeetings(){lsSet('meetings',meetings);}
+async function backupAllMeetings(){
+  const btn=document.getElementById('mtg-backup-btn');
+  if(btn){btn.textContent='☁ Saving...';btn.disabled=true;}
+  let ok=0;
+  for(const m of meetings){
+    const payload={...m};
+    const photos=payload.photos||[];
+    delete payload.photos;
+    if(payload.photo) delete payload.photo;
+    if(photos.length) lsSet('mtg_photos_'+m.id, photos);
+    const saved=await SB.upsert('cf_meetings',{id:String(m.id),data:JSON.stringify(payload),updated_at:new Date().toISOString()});
+    if(saved) ok++;
+  }
+  if(btn){btn.textContent='☁ Backup';btn.disabled=false;}
+  showToast('✓ '+ok+'/'+meetings.length+' meetings backed up to Supabase');
+}
+
+function saveMeetings(){
+  lsSet('meetings',meetings);
+  // Push to Supabase immediately — don't lose field data
+  if(meetings.length){
+    const m=meetings[0];
+    // Strip photos from Supabase payload (too large) — store separately
+    const payload={...m};
+    const photos=payload.photos||[]; delete payload.photos;
+    if(payload.photo) delete payload.photo; // legacy single photo
+    SB.upsert('cf_meetings',{id:String(m.id),data:JSON.stringify(payload),updated_at:new Date().toISOString()});
+    // Save photos separately in localStorage with meeting id key
+    if(photos.length) lsSet('mtg_photos_'+m.id, photos);
+  }
+}
+
+function renderMtgPhotos(m){
+  const photos=m.photos||[];
+  if(!photos.length) return '';
+  let html='<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.4rem">';
+  photos.forEach(function(ph){
+    html+='<img src="'+ph+'" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border);cursor:pointer" onclick="showPhoto(this.src)">';
+  });
+  html+='</div>';
+  return html;
+}
 
 function renderMeetings(){
   const el=document.getElementById('mtg-list');if(!el)return;
@@ -1705,7 +1841,7 @@ function renderMeetings(){
       </div>
       <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);margin-bottom:.35rem">${date} · ${m.duration||'0:00'}${m.contact?' · '+m.contact:''}</div>
       ${m.prenotes?`<div style="font-size:.77rem;color:var(--muted);font-style:italic;margin-bottom:.35rem">${m.prenotes}</div>`:''}
-      ${m.photo?`<img src="${m.photo}" style="width:100%;max-width:180px;border-radius:var(--rs);margin-bottom:.4rem;border:1.5px solid var(--border);display:block">`:''}
+      ${renderMtgPhotos(m)}
       ${m.summary?`<div style="font-size:.82rem;background:var(--blue-bg);border:1px solid var(--blue-bd);border-radius:var(--rs);padding:.5rem .7rem;margin-bottom:.5rem;color:var(--blue)">${m.summary}</div>`:''}
       ${m.transcript&&!m.transcript.startsWith('[')?`<div style="background:var(--bg);border-radius:var(--rs);padding:.65rem;font-size:.8rem;line-height:1.65;max-height:120px;overflow-y:auto;margin-bottom:.5rem;border:1px solid var(--border);white-space:pre-wrap">${m.transcript}</div>`:''}
       ${m.transcript&&m.transcript.startsWith('[')?`<div style="font-size:.78rem;color:var(--muted);font-style:italic;margin-bottom:.4rem">${m.transcript}</div>`:''}
@@ -2065,6 +2201,7 @@ async function optimiseRoute(){
 // ══════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════
+function showPhoto(src){document.getElementById('lb-img').src=src;document.getElementById('lightbox').classList.remove('hide');}
 function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2800);}
 
 // ══════════════════════════════════════════
