@@ -34,6 +34,14 @@ pre{font-size:.7rem;white-space:pre-wrap;word-break:break-all;max-height:200px;o
 <div class="card" id="upload-card" style="display:none">
   <strong>Step 2</strong> — Push to Supabase so the main app can see it<br><br>
   <button class="btn bg" onclick="uploadAll()">☁ Upload All to Supabase</button>
+  <br>
+  <button class="btn" style="background:#8a6d20;color:#fff;margin-top:.5rem" onclick="dumpRaw()">🔍 Inspect Raw Meeting Data</button>
+</div>
+
+<div class="card" id="raw-card" style="display:none">
+  <strong>Raw data structure:</strong><br><br>
+  <pre id="raw-dump" style="font-size:.65rem;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></pre>
+  <button class="btn bp" onclick="forceExtract()" style="margin-top:.5rem">⚡ Force Extract All Meetings</button>
 </div>
 
 <script>
@@ -111,6 +119,29 @@ function scanAll(){
   document.getElementById('results').style.display = 'block';
 }
 
+function dumpRaw(){
+  const raw = localStorage.getItem('cf2_meetings');
+  if(!raw){ alert('No cf2_meetings key found'); return; }
+  // Try to parse and show structure
+  try{
+    const val = JSON.parse(raw);
+    let info = 'Type: ' + typeof val + '\n';
+    if(Array.isArray(val)){
+      info += 'Array length: ' + val.length + '\n';
+      if(val[0]) info += 'First item keys: ' + Object.keys(val[0]).join(', ') + '\n';
+      info += '\nFirst 3 items:\n' + JSON.stringify(val.slice(0,3), null, 2).slice(0,2000);
+    } else {
+      info += 'Keys: ' + Object.keys(val).join(', ') + '\n';
+      info += JSON.stringify(val, null, 2).slice(0,2000);
+    }
+    document.getElementById('raw-dump').textContent = info;
+    document.getElementById('raw-card').style.display = 'block';
+  } catch(e){
+    document.getElementById('raw-dump').textContent = 'Parse error: ' + e.message + '\nRaw (first 500): ' + raw.slice(0,500);
+    document.getElementById('raw-card').style.display = 'block';
+  }
+}
+
 async function uploadAll(){
   const btn = document.querySelector('#upload-card .btn');
   btn.textContent = 'Uploading...';
@@ -151,6 +182,38 @@ async function uploadAll(){
     setStatus(`✓ Uploaded ${ok} meetings to Supabase. Open the main app and check Meetings tab.`, 'green');
   } else {
     setStatus('Upload failed — check your connection and try again.', 'red');
+  }
+}
+
+function forceExtract(){
+  const raw = localStorage.getItem('cf2_meetings');
+  if(!raw) return;
+  try{
+    const val = JSON.parse(raw);
+    let found = [];
+    // Try various structures
+    if(Array.isArray(val)) found = val;
+    else if(val.meetings) found = val.meetings;
+    else if(typeof val === 'object'){
+      // Could be keyed by id
+      found = Object.values(val).filter(v => v && typeof v === 'object' && (v.supplier || v.transcript));
+    }
+    
+    if(found.length){
+      allMeetings = found;
+      setStatus('Force extracted ' + found.length + ' meetings! Now tap Upload.', 'green');
+      // Show list
+      let html = document.getElementById('data-display').innerHTML;
+      html += '<div style="margin-top:.75rem;font-weight:700;color:#b94040">FORCE EXTRACTED ' + found.length + ' meetings:</div>';
+      found.forEach(m => {
+        html += '<div style="padding:.25rem 0;border-bottom:1px solid #e0ddd9;font-size:.82rem"><strong>' + (m.supplier||'Unknown') + '</strong> · ' + (m.ts ? new Date(m.ts).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'no date') + '</div>';
+      });
+      document.getElementById('data-display').innerHTML = html;
+    } else {
+      setStatus('Could not extract meetings from raw data — structure unknown', 'red');
+    }
+  } catch(e){
+    setStatus('Extract failed: ' + e.message, 'red');
   }
 }
 </script>
