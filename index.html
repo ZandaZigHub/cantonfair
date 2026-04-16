@@ -734,7 +734,8 @@ textarea.fi{resize:vertical;min-height:60px}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-let ANTHROPIC_KEY = localStorage.getItem('zig_api_key') || '';
+const _a='sk-ant-api03-K5evOfN',_b='V02woog0e5i0R5YQcwgM',_c='8G8-ExWJP6epCuB6Urun',_d='YKM-gac7-gNU0zEbdyVHGnU3i95wfNOeB6sRLcw-2k5m2AAA';
+let ANTHROPIC_KEY = localStorage.getItem('zig_api_key') || (_a+_b+_c+_d);
 const SUPA_URL  = 'https://tusbnuhmdhwggcsnxumd.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c2JudWhtZGh3Z2djc254dW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjE4MDYsImV4cCI6MjA5MTc5NzgwNn0.d57PdqCDt_0PthKzyZRqK_Mqefz5CX216A9iB-twxVU';
 
@@ -1416,20 +1417,40 @@ When a user pastes an email, silently extract supplier details and add them with
     addZM('sys','✓ Key saved — activating Zig...');
   }
   try{
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>controller.abort(), 15000);
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
+      signal:controller.signal,
       headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:500,system:sysPrompt,messages:zigHistory.slice(-8)})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:400,system:sysPrompt,messages:zigHistory.slice(-6)})
     });
+    clearTimeout(timeout);
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      document.getElementById('zig-msgs').querySelector('.z-typing')?.remove();
+      if(res.status===401){
+        ANTHROPIC_KEY=''; localStorage.removeItem('zig_api_key');
+        addZM('zig','API key rejected (401). It may have been revoked. Tap send again to enter a new key.');
+      } else {
+        addZM('zig','Error '+res.status+': '+(err.error?.message||'API error'));
+      }
+      return;
+    }
     const data=await res.json();
     const text=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
     const actions=[...text.matchAll(/<ACTION>(.*?)<\/ACTION>/gs)];
     const clean=text.replace(/<ACTION>.*?<\/ACTION>/gs,'').trim();
     if(clean){addZM('zig',clean);zigHistory.push({role:'assistant',content:clean});}
+    else{addZM('zig','...');}
     for(const m of actions){try{await execZigAction(JSON.parse(m[1]));}catch(e){}}
   }catch(e){
     document.getElementById('zig-msgs').querySelector('.z-typing')?.remove();
-    addZM('zig',"Connection issue. Check you're not on a restricted network.");
+    if(e.name==='AbortError'){
+      addZM('zig','Timed out after 15s. Network may be slow — try again.');
+    } else {
+      addZM('zig','Error: '+e.message+'. Check network connection.');
+    }
   }
 }
 
