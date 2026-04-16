@@ -1470,7 +1470,21 @@ let meetings=[], activeMeeting=null, speechRec=null, liveTranscript='', wakeLock
 let meetingElapsed=0, meetingTimer=null, meetingPhotos=[];
 
 async function initMeetings(){
+  // Try current key first
   meetings=lsGet('meetings',[]);
+  
+  // Recovery: check old localStorage keys from previous app versions
+  if(!meetings.length){
+    const oldKeys=['cf_meetings','cf2_meetings','canton_meetings'];
+    for(const key of oldKeys){
+      try{
+        const v=localStorage.getItem(key);
+        if(v){const parsed=JSON.parse(v);if(parsed&&parsed.length){meetings=parsed;showToast('✓ Recovered '+parsed.length+' meetings from backup');break;}}
+      }catch(e){}
+    }
+    if(meetings.length) lsSet('meetings',meetings);
+  }
+  
   renderMeetings();
   // Also fetch from Supabase to catch any meetings from other sessions
   try{
