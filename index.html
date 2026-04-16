@@ -689,15 +689,11 @@ textarea.fi{resize:vertical;min-height:60px}
       <button class="btn btn-p btn-full" id="notes-save-btn" style="margin-top:.4rem">Save Notes</button>
     </div>
 
-    <!-- API Key -->
-    <div class="card" style="margin-bottom:.75rem">
-      <div class="ct">⚡ Zig API Key</div>
-      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.5rem">Required for Zig, Lookup, and meeting transcription. Get a key at <strong>console.anthropic.com</strong> → API Keys. Stored only on this device, never sent to GitHub.</div>
-      <div style="display:flex;gap:.4rem;margin-bottom:.4rem">
-        <input class="fi" id="api-key-input" type="password" placeholder="sk-ant-api03-..." style="flex:1;font-family:monospace;font-size:.8rem">
-        <button class="btn btn-p" id="api-key-save">Save</button>
-      </div>
-      <div id="api-key-status" style="font-size:.75rem"></div>
+    <!-- Proxy status -->
+    <div class="card card-green" style="margin-bottom:.75rem">
+      <div class="ct">⚡ Zig Status</div>
+      <div style="font-size:.78rem;color:var(--muted)">Zig runs via Supabase Edge Function — API key stored securely server-side. No setup needed.</div>
+      <div style="margin-top:.4rem"><span class="b bg">Secure proxy active</span></div>
     </div>
 
     <!-- Logout -->
@@ -734,8 +730,7 @@ textarea.fi{resize:vertical;min-height:60px}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const _a='sk-ant-api03-K5evOfN',_b='V02woog0e5i0R5YQcwgM',_c='8G8-ExWJP6epCuB6Urun',_d='YKM-gac7-gNU0zEbdyVHGnU3i95wfNOeB6sRLcw-2k5m2AAA';
-let ANTHROPIC_KEY = localStorage.getItem('zig_api_key') || (_a+_b+_c+_d);
+const ANTHROPIC_KEY = 'via-proxy'; // Key stored securely in Supabase Edge Function
 const SUPA_URL  = 'https://tusbnuhmdhwggcsnxumd.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c2JudWhtZGh3Z2djc254dW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjE4MDYsImV4cCI6MjA5MTc5NzgwNn0.d57PdqCDt_0PthKzyZRqK_Mqefz5CX216A9iB-twxVU';
 
@@ -1409,20 +1404,14 @@ You can take actions. Return JSON in tags (no explanation needed, just do it):
 
 When a user pastes an email, silently extract supplier details and add them without asking.`;
 
-  if(!ANTHROPIC_KEY){
-    const k = prompt('Enter Anthropic API key to activate Zig (get one at console.anthropic.com → API Keys):');
-    if(!k || !k.startsWith('sk-ant-')){ addZM('zig','⚠ Invalid or no key entered. Get one at console.anthropic.com'); return; }
-    ANTHROPIC_KEY = k;
-    localStorage.setItem('zig_api_key', k);
-    addZM('sys','✓ Key saved — activating Zig...');
-  }
+
   try{
     const controller = new AbortController();
     const timeout = setTimeout(()=>controller.abort(), 15000);
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('https://tusbnuhmdhwggcsnxumd.supabase.co/functions/v1/zig-proxy',{
       method:'POST',
       signal:controller.signal,
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:400,system:sysPrompt,messages:zigHistory.slice(-6)})
     });
     clearTimeout(timeout);
@@ -1430,8 +1419,7 @@ When a user pastes an email, silently extract supplier details and add them with
       const err=await res.json().catch(()=>({}));
       document.getElementById('zig-msgs').querySelector('.z-typing')?.remove();
       if(res.status===401){
-        ANTHROPIC_KEY=''; localStorage.removeItem('zig_api_key');
-        addZM('zig','API key rejected (401). It may have been revoked. Tap send again to enter a new key.');
+        addZM('zig','Proxy error 401 — check Supabase Edge Function is deployed and Canton26 secret is set.');
       } else {
         addZM('zig','Error '+res.status+': '+(err.error?.message||'API error'));
       }
@@ -1665,17 +1653,11 @@ function editMeetingNotes(id){
 }
 
 async function extractActions(m){
-  if(!ANTHROPIC_KEY){
-    const k = prompt('Enter Anthropic API key to activate Zig (get one at console.anthropic.com → API Keys):');
-    if(!k || !k.startsWith('sk-ant-')){ addZM('zig','⚠ Invalid or no key entered. Get one at console.anthropic.com'); return; }
-    ANTHROPIC_KEY = k;
-    localStorage.setItem('zig_api_key', k);
-    addZM('sys','✓ Key saved — activating Zig...');
-  }
+
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('https://tusbnuhmdhwggcsnxumd.supabase.co/functions/v1/zig-proxy',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',max_tokens:500,
         system:'Zanda Hardware Canton Fair meeting analyst. Return ONLY JSON: {"summary":"2-3 sentences on products, prices, MOQs, key outcomes","actions":[{"text":"specific action","owner":"BW or GW or SUPPLIER","done":false}]}. BW=Brent Wallis, GW=Greg Wallis.',
@@ -2013,14 +1995,10 @@ async function doLookup(){
   const el=document.getElementById('lq-result');
   el.innerHTML=`<div style="padding:.75rem;color:var(--muted)"><span class="spin"></span>Searching Canton Fair for "${q}"...</div>`;
   try{
-    if(!ANTHROPIC_KEY){
-      const k = prompt('Enter Anthropic API key to activate Lookup (get one at console.anthropic.com → API Keys):');
-      if(!k || !k.startsWith('sk-ant-')){ el.innerHTML='<div class="al al-r">⚠ No key entered.</div>'; return; }
-      ANTHROPIC_KEY = k; localStorage.setItem('zig_api_key', k);
-    }
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+
+    const res=await fetch('https://tusbnuhmdhwggcsnxumd.supabase.co/functions/v1/zig-proxy',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',max_tokens:800,
         system:'You are a Canton Fair hardware exhibitor expert. The user is searching Canton Fair 2026 Phase 1 Hall 10.1 (architectural hardware, door hardware, locks). Return ONLY valid JSON, no markdown, no explanation: {"results":[{"name":"Company name","booth":"10.1 XXX","products":"what they make","tip":"one buying tip"}],"summary":"2 sentences about this product category at Canton Fair"}. Give 3-5 realistic results based on your knowledge of Chinese hardware manufacturers who exhibit at Canton Fair. If unsure of exact booth, say TBC.',
@@ -2065,17 +2043,11 @@ async function optimiseRoute(){
   el.innerHTML='<div style="color:var(--muted)"><span class="spin"></span>Calculating optimal route...</div>';
   
   const boothList=pending.map(s=>`${s.name} — ${s.booth}`).join('\n');
-  if(!ANTHROPIC_KEY){
-    const k = prompt('Enter Anthropic API key to activate Zig (get one at console.anthropic.com → API Keys):');
-    if(!k || !k.startsWith('sk-ant-')){ addZM('zig','⚠ Invalid or no key entered. Get one at console.anthropic.com'); return; }
-    ANTHROPIC_KEY = k;
-    localStorage.setItem('zig_api_key', k);
-    addZM('sys','✓ Key saved — activating Zig...');
-  }
+
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('https://tusbnuhmdhwggcsnxumd.supabase.co/functions/v1/zig-proxy',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',max_tokens:600,
         system:'You are a Canton Fair route planner. Hall 10.1 has rows A-H, booths numbered within each row. Optimise the visit sequence to minimise backtracking. Provide a numbered list with supplier name, booth, and a one-line reason for the order. Be concise.',
