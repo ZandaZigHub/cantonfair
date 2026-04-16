@@ -450,7 +450,8 @@ textarea.fi{resize:vertical;min-height:60px}
         <div class="fg"><label class="flabel">Contact</label><input class="fi" id="sf-c" placeholder="Name"></div>
         <div class="fg"><label class="flabel">Email</label><input class="fi" id="sf-e" placeholder="email@..."></div>
       </div>
-      <div class="fg"><label class="flabel">Notes</label><textarea class="fi" id="sf-no" placeholder="What to discuss..."></textarea></div>
+      <div class="fg"><label class="flabel">Agenda / objectives</label><textarea class="fi" id="sf-ag" rows="2" placeholder="e.g. Price on 1177 bolt, MOQ for hinges, sample availability, exclusivity..."></textarea></div>
+      <div class="fg"><label class="flabel">Notes</label><textarea class="fi" id="sf-no" placeholder="Background, history, what they make..."></textarea></div>
       <div class="frow"><button class="btn btn-p" id="sf-save">Save</button><button class="btn" id="sf-cancel">Cancel</button></div>
     </div>
     <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.75rem" id="sup-filters">
@@ -598,8 +599,8 @@ textarea.fi{resize:vertical;min-height:60px}
         <input type="file" id="mtg-photo-input" accept="image/*" capture="environment" style="display:none">
       </div>
       <div class="fg">
-        <label class="flabel">Pre-notes (optional)</label>
-        <textarea class="fi" id="mtg-prenotes" rows="2" placeholder="Key things to discuss..."></textarea>
+        <label class="flabel">Agenda / key objectives</label>
+        <textarea class="fi" id="mtg-prenotes" rows="3" placeholder="e.g. Price on euro cylinder range, MOQ, sample lead time, exclusivity options, DDA compliance..."></textarea>
       </div>
       <div class="frow">
         <button class="btn btn-p" id="mtg-start-rec" style="flex:1">🎤 Start Recording</button>
@@ -1015,7 +1016,9 @@ function renderSup(){
       html+=`<div class="sc ${s.done?'done':''}">
         <div class="sc-top"><div class="sc-name">${s.name}${s.name==='MVM Hardware'?' 🎒':''}</div>
           <span class="b ${s.done?'bg':g==='Fair'?'bn':g==='Hotel'?'bb':'ba'}">${s.done?'Done':g}</span></div>
-        <div class="sc-meta">${s.contact?'👤 '+s.contact+(s.email?' · '+s.email:''):''}${s.booth?'<br>📍 '+s.booth:''}${s.notes?'<br>'+s.notes:''}</div>
+        <div class="sc-meta">${s.contact?'👤 '+s.contact+(s.email?' · '+s.email:''):''}${s.booth?'<br>📍 '+s.booth:''}</div>
+        ${s.agenda?`<div style="font-size:.78rem;background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:var(--rs);padding:.35rem .6rem;margin:.25rem 0;color:var(--amber)"><strong>Agenda:</strong> ${s.agenda}</div>`:''} 
+        ${s.notes?`<div style="font-size:.76rem;color:var(--muted);margin-top:.15rem">${s.notes}</div>`:''}
         <div class="sc-actions">
           <button class="btn btn-s ${s.done?'btn-r':'btn-ok'}" data-sup-done="${s.id}">${s.done?'↩ Undo':'✓ Done'}</button>
           ${s.email?`<button class="btn btn-s" onclick="window.open('mailto:${s.email}')">✉</button>`:''}
@@ -1044,11 +1047,13 @@ async function addSup(){
   const n=document.getElementById('sf-n').value.trim();if(!n)return;
   const item={id:Date.now(),name:n,meet_type:document.getElementById('sf-t').value,
     booth:document.getElementById('sf-b').value.trim(),contact:document.getElementById('sf-c').value.trim(),
-    email:document.getElementById('sf-e').value.trim(),notes:document.getElementById('sf-no').value.trim(),
+    email:document.getElementById('sf-e').value.trim(),
+    agenda:document.getElementById('sf-ag').value.trim(),
+    notes:document.getElementById('sf-no').value.trim(),
     done:false,updated_at:new Date().toISOString()};
   suppliers.push(item);renderSup();
   document.getElementById('sup-form').classList.remove('open');
-  ['sf-n','sf-b','sf-c','sf-e','sf-no'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['sf-n','sf-b','sf-c','sf-e','sf-ag','sf-no'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   await saveItem('cf_suppliers',suppliers,item);showToast('Supplier added');
 }
 
@@ -1403,7 +1408,13 @@ You can take actions. Return JSON in tags (no explanation needed, just do it):
 
 When a user pastes an email, silently extract supplier details and add them without asking.`;
 
-  if(!ANTHROPIC_KEY){ addZM('zig','⚠ No API key. Go to ⚙ Options tab and add your Anthropic key to activate Zig.'); return; }
+  if(!ANTHROPIC_KEY){
+    const k = prompt('Enter Anthropic API key to activate Zig (get one at console.anthropic.com → API Keys):');
+    if(!k || !k.startsWith('sk-ant-')){ addZM('zig','⚠ Invalid or no key entered. Get one at console.anthropic.com'); return; }
+    ANTHROPIC_KEY = k;
+    localStorage.setItem('zig_api_key', k);
+    addZM('sys','✓ Key saved — activating Zig...');
+  }
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1502,6 +1513,11 @@ function startMeetingRec(){
 
   const contact=document.getElementById('mtg-contact').value.trim();
   const prenotes=document.getElementById('mtg-prenotes').value.trim();
+  // Auto-fill agenda from supplier record
+  const supRecord = suppliers.find(s=>s.name===supplierName);
+  if(supRecord && supRecord.agenda && !prenotes){
+    document.getElementById('mtg-prenotes').value = supRecord.agenda;
+  }
 
   // Check Web Speech API support
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1628,7 +1644,13 @@ function editMeetingNotes(id){
 }
 
 async function extractActions(m){
-  if(!ANTHROPIC_KEY){ addZM('zig','⚠ No API key. Go to ⚙ Options tab and add your Anthropic key to activate Zig.'); return; }
+  if(!ANTHROPIC_KEY){
+    const k = prompt('Enter Anthropic API key to activate Zig (get one at console.anthropic.com → API Keys):');
+    if(!k || !k.startsWith('sk-ant-')){ addZM('zig','⚠ Invalid or no key entered. Get one at console.anthropic.com'); return; }
+    ANTHROPIC_KEY = k;
+    localStorage.setItem('zig_api_key', k);
+    addZM('sys','✓ Key saved — activating Zig...');
+  }
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1970,7 +1992,11 @@ async function doLookup(){
   const el=document.getElementById('lq-result');
   el.innerHTML=`<div style="padding:.75rem;color:var(--muted)"><span class="spin"></span>Searching Canton Fair for "${q}"...</div>`;
   try{
-    if(!ANTHROPIC_KEY){ el.innerHTML='<div class="al al-r">⚠ No API key — go to ⚙ Options tab and add your Anthropic key.</div>'; return; }
+    if(!ANTHROPIC_KEY){
+      const k = prompt('Enter Anthropic API key to activate Lookup (get one at console.anthropic.com → API Keys):');
+      if(!k || !k.startsWith('sk-ant-')){ el.innerHTML='<div class="al al-r">⚠ No key entered.</div>'; return; }
+      ANTHROPIC_KEY = k; localStorage.setItem('zig_api_key', k);
+    }
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','x-api-key':ANTHROPIC_KEY},
@@ -2018,7 +2044,13 @@ async function optimiseRoute(){
   el.innerHTML='<div style="color:var(--muted)"><span class="spin"></span>Calculating optimal route...</div>';
   
   const boothList=pending.map(s=>`${s.name} — ${s.booth}`).join('\n');
-  if(!ANTHROPIC_KEY){ addZM('zig','⚠ No API key. Go to ⚙ Options tab and add your Anthropic key to activate Zig.'); return; }
+  if(!ANTHROPIC_KEY){
+    const k = prompt('Enter Anthropic API key to activate Zig (get one at console.anthropic.com → API Keys):');
+    if(!k || !k.startsWith('sk-ant-')){ addZM('zig','⚠ Invalid or no key entered. Get one at console.anthropic.com'); return; }
+    ANTHROPIC_KEY = k;
+    localStorage.setItem('zig_api_key', k);
+    addZM('sys','✓ Key saved — activating Zig...');
+  }
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -2047,14 +2079,14 @@ function showToast(m){const t=document.getElementById('toast');t.textContent=m;t
 // ══════════════════════════════════════════
 const DEFAULT_SUP=[
   {id:1,name:"Foshan",contact:"Alex Liao",email:"alex13310892221@live.com",booth:"",meet_type:"Hotel",notes:"Take a 4013",done:false},
-  {id:2,name:"Metfull Products",contact:"Penny Peng",email:"info@metfull.com",booth:"",meet_type:"Hotel",notes:"Friday. Take 1177 bolt sample.",done:false},
+  {id:2,name:"Metfull Products",contact:"Penny Peng",email:"info@metfull.com",booth:"",meet_type:"Hotel",notes:"Friday. Take 1177 bolt sample.",agenda:"Review 1177 bolt — pricing update, new finishes? Any new products in the range. MOQ and lead times.",done:false},
   {id:3,name:"Spiewak",contact:"Bowie",email:"bowie@spiewakgroup.com",booth:"",meet_type:"Hotel",notes:"Hinge packaging",done:false},
   {id:4,name:"Micota",contact:"Michelle Zhou",email:"sales5@micota.net",booth:"",meet_type:"Hotel",notes:"Friday. Mr Peng will meet at hotel.",done:false},
   {id:5,name:"Leeder Hardware",contact:"Simon Lee",email:"simonlee@leaderhardware.com",booth:"",meet_type:"Hotel",notes:"",done:false},
   {id:6,name:"Dktion Hardware",contact:"Suki",email:"suki@dktion.com",booth:"",meet_type:"Hotel",notes:"Follow up",done:false},
-  {id:7,name:"MVM Hardware",contact:"Kira Wu",email:"kira@mvm.com.cn",booth:"10.1 C45–46",meet_type:"Fair",notes:"⭐ DROP & COLLECT BAGS HERE. Collect by 09:30 Fri.",done:false},
+  {id:7,name:"MVM Hardware",contact:"Kira Wu",email:"kira@mvm.com.cn",booth:"10.1 C45–46",meet_type:"Fair",notes:"⭐ DROP & COLLECT BAGS HERE. Collect by 18:00 Thu.",agenda:"Drop bags Thu morning, collect by 18:00. Discuss new product range — hinges, handles. Pricing and MOQ on key lines.",done:false},
   {id:8,name:"Spark",contact:"Nicky Feng",email:"spark1@spark-lock.com",booth:"10.1 H36",meet_type:"Fair",notes:"",done:false},
-  {id:9,name:"Liliwise",contact:"Nolar Liao",email:"lock@liliwise.com",booth:"10.1 B27–28 & C15–16",meet_type:"Fair",notes:"✓ CONFIRMED — Nolar + boss + technician. Oval cylinder stealth smart lock. WeChat +8618925182995",done:false},
+  {id:9,name:"Liliwise",contact:"Nolar Liao",email:"lock@liliwise.com",booth:"10.1 B27–28 & C15–16",meet_type:"Fair",notes:"✓ CONFIRMED — Nolar + boss + technician. WeChat +8618925182995",agenda:"Oval cylinder stealth smart lock — see demo, get pricing, MOQ, AU compliance, exclusivity options. What finishes available? Lead time? Can we white-label?",done:false},
   {id:10,name:"Oubou",contact:"",email:"",booth:"10.1 C33–34, D13–14",meet_type:"Fair",notes:"",done:false},
   {id:11,name:"Oude",contact:"",email:"",booth:"9.1 F41",meet_type:"Fair",notes:"",done:false},
   {id:12,name:"Lumax",contact:"Kelvin Chan",email:"kelvinhw@vip.163.com",booth:"",meet_type:"Hotel",notes:"",done:false},
