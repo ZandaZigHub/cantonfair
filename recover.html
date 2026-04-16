@@ -59,28 +59,30 @@ function scanAll(){
   allHitlist = [];
   
   const display = document.getElementById('data-display');
-  let html = '';
+  let html = '<div style="font-weight:700;margin-bottom:.5rem">ALL localStorage keys (' + localStorage.length + ' total):</div>';
   
-  // Scan ALL localStorage keys
+  if(localStorage.length === 0){
+    html += '<div style="color:#b94040;padding:.5rem 0">localStorage is completely empty on this device.</div>';
+  }
+  
   for(let i = 0; i < localStorage.length; i++){
     const key = localStorage.key(i);
+    const raw = localStorage.getItem(key);
+    html += '<div style="padding:.3rem 0;border-bottom:1px solid #e0ddd9;font-size:.8rem"><code style="background:#e8e4d4;padding:.1rem .3rem;border-radius:3px">' + key + '</code> — ' + (raw ? raw.length : 0) + ' chars</div>';
+    
     try{
-      const val = JSON.parse(localStorage.getItem(key));
-      
-      // Check for meetings arrays
-      if(Array.isArray(val) && val.length && val[0].supplier){
+      const val = JSON.parse(raw);
+      if(Array.isArray(val) && val.length && val[0] && val[0].supplier){
         allMeetings = [...allMeetings, ...val.filter(m => m.id && m.supplier)];
-        html += `<div style="margin:.4rem 0;color:#296366">✓ Meetings (${val.length}) found in key: <code>${key}</code></div>`;
+        html += '<div style="color:#296366;font-size:.8rem;padding-left:.5rem">↳ ✓ Contains ' + val.length + ' meetings</div>';
       }
-      // Check for suppliers
-      if(Array.isArray(val) && val.length && val[0].meet_type){
+      if(Array.isArray(val) && val.length && val[0] && val[0].meet_type){
         allSuppliers = [...allSuppliers, ...val];
-        html += `<div style="margin:.4rem 0;color:#296366">✓ Suppliers (${val.length}) found in key: <code>${key}</code></div>`;
+        html += '<div style="color:#296366;font-size:.8rem;padding-left:.5rem">↳ ✓ Contains ' + val.length + ' suppliers</div>';
       }
-      // Check for hitlist
-      if(Array.isArray(val) && val.length && val[0].priority){
+      if(Array.isArray(val) && val.length && val[0] && val[0].priority){
         allHitlist = [...allHitlist, ...val];
-        html += `<div style="margin:.4rem 0;color:#296366">✓ Hit list (${val.length}) found in key: <code>${key}</code></div>`;
+        html += '<div style="color:#296366;font-size:.8rem;padding-left:.5rem">↳ ✓ Contains ' + val.length + ' hit list items</div>';
       }
     } catch(e){}
   }
